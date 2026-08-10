@@ -43,5 +43,27 @@ publish = false
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
 
-# 共通依存。Phase 0 では外部依存なし。Phase 1 以降で追加する。
+# 共通依存。各 crate は `dep.workspace = true` で継承する。
+# version は Cargo.lock へ pin され、cargo-deny で再現性と供給連鎖安全を担保する（互換 §11）。
+# RustCrypto / serde / chrono / toml 系は全て MIT または Apache-2.0（deny.toml の許可リスト内）。
 [workspace.dependencies]
+# 決定的 ID・digest（規範 §12、Schema §2.1）
+sha2 = "0.10"
+hex = "0.4"
+# canonical JSON・Schema 検証・Case JSON 読み書き（Schema §2.1、§5、§9）
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+# default-features を切り、Draft 2020-12（Schema §4・§7 が使用）だけを有効化する。
+# 外部 file 参照（resolve-file）・HTTP 参照（reqwest）・CLI は使用しない。
+jsonschema = { version = "0.23", default-features = false, features = ["draft202012"] }
+# 時刻モデル（規範 §6、Schema §4）。chrono は DateTime<Utc> と NaiveDateTime を提供。
+# clock feature はテスト等の現在時刻参照用。std 以外の default feature は除外する。
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+# IANA timezone と DST 処理（規範 §6.2、Schema §8.3）
+chrono-tz = "0.10"
+# TOML 設定 load（Schema §8）
+toml = "0.8"
+# Error 型の derive（規範 §17）
+thiserror = "1"
+# property test（T1-008、T1-016、T1-032 等）
+proptest = "1"

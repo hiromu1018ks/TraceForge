@@ -1,0 +1,2 @@
+{"schema_version":"1.0.0","record_type":"case","record":{"case_id":"tf-case-v1:x","external_case_id":null,"name":"demo","analyst":null,"description":null,"default_timezone":null,"tags":[]}}
+{"schema_version":"1.0.0","record_type":"evidence","record":{"evidence_id":"tf-evidence-v1:y","source_locator":"a.evtx","size":1,"sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","integrity_status":"verified_snapshot","parse_eligible":true}}

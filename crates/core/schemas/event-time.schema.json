@@ -1,0 +1,76 @@
+{
+  "$id": "https://traceforge.example/schema/v1/event-time.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TraceForge Event Time v1",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "value", "original", "kind", "precision", "timezone_source", "uncertainty_ms"],
+      "properties": {
+        "type": { "const": "utc_instant" },
+        "value": { "type": "string", "format": "date-time", "pattern": "Z$" },
+        "original": { "type": ["string", "null"] },
+        "kind": { "$ref": "#/$defs/timestamp_kind" },
+        "precision": { "$ref": "#/$defs/precision" },
+        "timezone_source": { "$ref": "#/$defs/timezone_source" },
+        "uncertainty_ms": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "value", "timezone", "original", "kind", "precision", "timezone_source", "uncertainty_ms"],
+      "properties": {
+        "type": { "const": "local_time" },
+        "value": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?$" },
+        "timezone": { "type": ["string", "null"], "minLength": 1 },
+        "original": { "type": ["string", "null"] },
+        "kind": { "$ref": "#/$defs/timestamp_kind" },
+        "precision": { "$ref": "#/$defs/precision" },
+        "timezone_source": { "$ref": "#/$defs/timezone_source" },
+        "uncertainty_ms": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "start", "end", "original", "kind", "precision", "timezone_source", "uncertainty_ms"],
+      "properties": {
+        "type": { "const": "range" },
+        "start": { "type": ["string", "null"], "format": "date-time", "pattern": "Z$" },
+        "end": { "type": ["string", "null"], "format": "date-time", "pattern": "Z$" },
+        "original": { "type": ["string", "null"] },
+        "kind": { "$ref": "#/$defs/timestamp_kind" },
+        "precision": { "$ref": "#/$defs/precision" },
+        "timezone_source": { "$ref": "#/$defs/timezone_source" },
+        "uncertainty_ms": { "type": ["integer", "null"], "minimum": 0 }
+      },
+      "not": { "properties": { "start": { "type": "null" }, "end": { "type": "null" } } }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "original", "kind", "precision", "timezone_source", "uncertainty_ms"],
+      "properties": {
+        "type": { "const": "unknown" },
+        "original": { "type": ["string", "null"] },
+        "kind": { "$ref": "#/$defs/timestamp_kind" },
+        "precision": { "$ref": "#/$defs/precision" },
+        "timezone_source": { "const": "unknown" },
+        "uncertainty_ms": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    }
+  ],
+  "$defs": {
+    "timestamp_kind": {
+      "enum": ["created", "modified", "accessed", "executed", "event_logged", "registry_modified", "observed", "unknown"]
+    },
+    "precision": {
+      "enum": ["nanosecond", "microsecond", "millisecond", "second", "minute", "day", "unknown"]
+    },
+    "timezone_source": {
+      "enum": ["artifact_defined", "explicit_offset", "case_default", "cli_override", "inferred", "unknown"]
+    }
+  }
+}

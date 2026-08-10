@@ -46,71 +46,71 @@
 
 ### 4.1 決定的 ID
 
-- [ ] T1-001 length-prefixed encoding の実装（規範 §12.2、null = `0xFFFFFFFF`、整数・enum・list の規則）
-- [ ] T1-002 SHA-256 lowercase hex ユーティリティ（Schema §2.1）
-- [ ] T1-003 ID 生成器（`tf-case/evidence/artifact/event/match/finding-v1:` prefix、規範 §12.1）
-- [ ] T1-004 Evidence ID 生成（field 順: literal・locator・size・sha256、規範 §5.6）
-- [ ] T1-005 Case ID 生成（evidence_id の byte 順 sort 連結、規範 §4.1）
-- [ ] T1-006 Artifact / Match / Finding ID 生成（規範 §12.4）
-- [ ] T1-007 Event ID 生成（12 field 順、event_ordinal 対応、規範 §12.3）
-- [ ] T1-008 ID 決定性 test（同一入力から同一 ID、message 変更で不変）
+- [x] T1-001 length-prefixed encoding の実装（規範 §12.2、null = `0xFFFFFFFF`、整数・enum・list の規則）
+- [x] T1-002 SHA-256 lowercase hex ユーティリティ（Schema §2.1）
+- [x] T1-003 ID 生成器（`tf-case/evidence/artifact/event/match/finding-v1:` prefix、規範 §12.1）
+- [x] T1-004 Evidence ID 生成（field 順: literal・locator・size・sha256、規範 §5.6）
+- [x] T1-005 Case ID 生成（evidence_id の byte 順 sort 連結、規範 §4.1）
+- [x] T1-006 Artifact / Match / Finding ID 生成（規範 §12.4）
+- [x] T1-007 Event ID 生成（12 field 順、event_ordinal 対応、規範 §12.3）
+- [x] T1-008 ID 決定性 test（同一入力から同一 ID、message 変更で不変）
 
 ### 4.2 時刻モデル
 
-- [ ] T1-010 `TemporalValue` / `EventTime` 型実装（規範 §6.1）
-- [ ] T1-011 `TimePrecision` / `TimezoneSource` / `TimestampKind` enum（規範 §6.1、Schema §4）
-- [ ] T1-012 時刻変換規則実装（offset 変換、Case default / CLI override、元値保持、規範 §6.2）
-- [ ] T1-013 DST 処理（不存在時刻 Warning、2義的時刻は Range/LocalTime 保持、規範 §6.2）
-- [ ] T1-014 不明時刻の `Unknown` 化（現在時刻・mtime で補完禁止、規範 §6.2）
-- [ ] T1-015 IANA timezone 検証（Schema §8.3）
-- [ ] T1-016 時刻モデル property test（実在日付のみ、UTC 化の可逆的情報保持）
+- [x] T1-010 `TemporalValue` / `EventTime` 型実装（規範 §6.1）
+- [x] T1-011 `TimePrecision` / `TimezoneSource` / `TimestampKind` enum（規範 §6.1、Schema §4）
+- [x] T1-012 時刻変換規則実装（offset 変換、Case default / CLI override、元値保持、規範 §6.2）
+- [x] T1-013 DST 処理（不存在時刻 Warning、2義的時刻は Range/LocalTime 保持、規範 §6.2）
+- [x] T1-014 不明時刻の `Unknown` 化（現在時刻・mtime で補完禁止、規範 §6.2）
+- [x] T1-015 IANA timezone 検証（Schema §8.3）
+- [x] T1-016 時刻モデル property test（実在日付のみ、UTC 化の可逆的情報保持）
 
 ### 4.3 Event と Provenance
 
-- [ ] T1-020 `Event` 型実装（規範 §7.1、Schema §5.5）
-- [ ] T1-021 `AssertionKind`（Observed / Inferred、規範 §7.1）
-- [ ] T1-022 `ProcessRef` 型実装（規範 §7.2）
-- [ ] T1-023 `Provenance` / `RecordLocator` 型実装（規範 §7.3）
-- [ ] T1-024 `attributes` は `BTreeMap` 固定（規範 §13.2）
+- [x] T1-020 `Event` 型実装（規範 §7.1、Schema §5.5）
+- [x] T1-021 `AssertionKind`（Observed / Inferred、規範 §7.1）
+- [x] T1-022 `ProcessRef` 型実装（規範 §7.2）
+- [x] T1-023 `Provenance` / `RecordLocator` 型実装（規範 §7.3）
+- [x] T1-024 `attributes` は `BTreeMap` 固定（規範 §13.2）
 
 ### 4.4 Windows path
 
-- [ ] T1-030 `WindowsPathValue` 型実装（規範 §8）
-- [ ] T1-031 `windows-path-v1` normalization profile 実装（6規則のみ、規範 §8）
-- [ ] T1-032 path 正規化 unit test（UNC 保持、case fold、`..` 解決、root 越え禁止）
-- [ ] T1-033 Evidence 内 path に `PathBuf` を使わないことの lint / review 規約（規範 §8）
+- [x] T1-030 `WindowsPathValue` 型実装（規範 §8）
+- [x] T1-031 `windows-path-v1` normalization profile 実装（6規則のみ、規範 §8）
+- [x] T1-032 path 正規化 unit test（UNC 保持、case fold、`..` 解決、root 越え禁止）
+- [x] T1-033 Evidence 内 path に `PathBuf` を使わないことの lint / review 規約（規範 §8）
 
 ### 4.5 Case・Schema 型
 
-- [ ] T1-040 `CaseMetadata` 型実装（規範 §4、Schema §5.2）
-- [ ] T1-041 `EvidenceItem` / `ArtifactInstance` 型実装（規範 §5.1、Schema §5.3–5.4）
-- [ ] T1-042 Issue 型実装（code・severity・scope、Schema §5.6、規範 §9.3）
-- [ ] T1-043 Match 型実装（correlation / sigma / yara_x、Schema §5.7）
-- [ ] T1-044 Finding 型実装（`created_at` 禁止、Schema §5.8、規範 §16）
-- [ ] T1-045 Manifest 型実装（規範 §20、Schema §5.9）
+- [x] T1-040 `CaseMetadata` 型実装（規範 §4、Schema §5.2）
+- [x] T1-041 `EvidenceItem` / `ArtifactInstance` 型実装（規範 §5.1、Schema §5.3–5.4）
+- [x] T1-042 Issue 型実装（code・severity・scope、Schema §5.6、規範 §9.3）
+- [x] T1-043 Match 型実装（correlation / sigma / yara_x、Schema §5.7）
+- [x] T1-044 Finding 型実装（`created_at` 禁止、Schema §5.8、規範 §16）
+- [x] T1-045 Manifest 型実装（規範 §20、Schema §5.9）
 
 ### 4.6 Schema 検証
 
-- [ ] T1-050 canonical JSON serializer（key の UTF-8 byte 順再帰 sort、最短 decimal、Schema §2.1）
-- [ ] T1-051 JSON Schema validator 導入（Schema §4–§8 の各 Schema）
-- [ ] T1-052 Case JSON 読み書き（top-level 固定、Schema §5.1）
-- [ ] T1-053 JSONL envelope（`schema_version` + `record_type`、Schema §6）
-- [ ] T1-054 version compatibility 規則実装（未知 field の扱い、major version 差 error、Schema §2.3）
-- [ ] T1-055 Schema fixture 整備（Schema §9 の9種: 最小 valid、全 field valid、必須欠落、major version 差、未知 enum、時刻特殊形、Manifest 欠落、未対応 operator、limit 0/負数）
-- [ ] T1-056 Schema validation test（全 fixture 合格、Schema §9）
+- [x] T1-050 canonical JSON serializer（key の UTF-8 byte 順再帰 sort、最短 decimal、Schema §2.1）
+- [x] T1-051 JSON Schema validator 導入（Schema §4–§8 の各 Schema）
+- [x] T1-052 Case JSON 読み書き（top-level 固定、Schema §5.1）
+- [x] T1-053 JSONL envelope（`schema_version` + `record_type`、Schema §6）
+- [x] T1-054 version compatibility 規則実装（未知 field の扱い、major version 差 error、Schema §2.3）
+- [x] T1-055 Schema fixture 整備（Schema §9 の9種: 最小 valid、全 field valid、必須欠落、major version 差、未知 enum、時刻特殊形、Manifest 欠落、未対応 operator、limit 0/負数）
+- [x] T1-056 Schema validation test（全 fixture 合格、Schema §9）
 
 ### 4.7 設定
 
-- [ ] T1-060 TOML 設定 load（優先順位: CLI > explicit > default > built-in、Schema §8.1）
-- [ ] T1-061 built-in defaults 実装（Schema §8.2 の全値）
-- [ ] T1-062 設定 validation（`snapshot_mode=always` のみ、`follow_symlinks=true` は error、limit ≥ 1、Schema §8.3）
-- [ ] T1-063 resolved configuration の canonical JSON 化 + SHA-256（Schema §8.1）
+- [x] T1-060 TOML 設定 load（優先順位: CLI > explicit > default > built-in、Schema §8.1）
+- [x] T1-061 built-in defaults 実装（Schema §8.2 の全値）
+- [x] T1-062 設定 validation（`snapshot_mode=always` のみ、`follow_symlinks=true` は error、limit ≥ 1、Schema §8.3）
+- [x] T1-063 resolved configuration の canonical JSON 化 + SHA-256（Schema §8.1）
 
 ### 4.8 Error と Exit Code
 
-- [ ] T1-070 Error 型階層と Exit Code 対応（規範 §17.2）
-- [ ] T1-071 Exit Code 優先順位ロジック（`10 > 6 > 5 > 4 > 3 > 2 > 1 > 0`、規範 §17.2）
-- [ ] T1-072 scope 付き strict mode（`--strict parser/rules/limits/all`、規範 §17.1）
+- [x] T1-070 Error 型階層と Exit Code 対応（規範 §17.2）
+- [x] T1-071 Exit Code 優先順位ロジック（`10 > 6 > 5 > 4 > 3 > 2 > 1 > 0`、規範 §17.2）
+- [x] T1-072 scope 付き strict mode（`--strict parser/rules/limits/all`、規範 §17.1）
 
 ---
 

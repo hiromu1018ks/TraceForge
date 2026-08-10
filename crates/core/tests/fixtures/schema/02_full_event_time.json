@@ -1,0 +1,14 @@
+{
+  "_comment": "Schema §9 fixture #2: 全 optional field を含む valid sample（local_time の全 field 充填）",
+  "expect": "valid",
+  "instance": {
+    "type": "local_time",
+    "value": "2026-08-10T01:15:20.500",
+    "timezone": "Asia/Tokyo",
+    "original": "2026/08/10 10:15:20.500 JST",
+    "kind": "observed",
+    "precision": "millisecond",
+    "timezone_source": "case_default",
+    "uncertainty_ms": 500
+  }
+}

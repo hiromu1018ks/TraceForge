@@ -1,0 +1,17 @@
+{
+  "_comment": "Schema §9 fixture #4: 異なる major version sample（Schema §2.3 で error）",
+  "expect": "invalid",
+  "schema": "case_bundle",
+  "instance": {
+    "schema_version": "2.0.0",
+    "record_type": "case_bundle",
+    "case": {},
+    "evidence": [],
+    "artifacts": [],
+    "events": [],
+    "issues": [],
+    "matches": [],
+    "findings": [],
+    "manifest": {}
+  }
+}

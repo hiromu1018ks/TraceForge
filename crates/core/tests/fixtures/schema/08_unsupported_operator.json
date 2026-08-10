@@ -1,0 +1,29 @@
+{
+  "_comment": "Schema §9 fixture #8: Correlation Rule の未対応 operator sample",
+  "expect": "invalid",
+  "schema": "correlation_rule",
+  "instance": {
+    "id": "TF-CORR-002",
+    "version": "1.0.0",
+    "title": "unsupported operator",
+    "severity": "low",
+    "sequence": [
+      {
+        "event_type": "x",
+        "where": [
+          {
+            "field": "path",
+            "operator": "regex_custom_unsupported",
+            "value": "a"
+          }
+        ]
+      }
+    ],
+    "within": "5m",
+    "partition_by": ["case_id"],
+    "score": {
+      "base": 0.5,
+      "adjustments": []
+    }
+  }
+}

@@ -19,11 +19,13 @@ yanked = "deny"
 private = { ignore = true }
 # 外部依存 crate に許可する license。
 # copyleft（GPL 等）は配布形態へ影響するため、既定で拒否する（互換 §11）。
-# Phase 0 では依存が criterion（dev）・libfuzzer-sys（fuzz）のみのため、
-# 許可リストの一部 license が未使用となり cargo-deny が
-# license-not-encountered 警告を出す。Phase 1 以降の依存追加で解消される。
+# 次のライセンスは寛容な license のみ許可する。一部 license は
+# 将来の依存追加（YARA-X・Sigma 等）へ備えて先に含めており、未使用の場合は
+# cargo-deny が license-not-encountered 警告を出す（エラーではない）。
 allow = [
     "MIT",
+    # MIT No Attribution（jsonschema 依存の borrow-or-share 等）。attribution 義務のない MIT 互換。
+    "MIT-0",
     "Apache-2.0",
     "Apache-2.0 WITH LLVM-exception",
     "BSD-2-Clause",

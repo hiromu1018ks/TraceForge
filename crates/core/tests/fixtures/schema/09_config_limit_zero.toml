@@ -1,0 +1,25 @@
+# Schema §9 fixture #9: Config limit が 0 または負数の sample（Schema §8.3 で error）。
+# expect = invalid（Config::validate が Err を返すべき）。
+# _expect フィールドは TOML では table だが、test 側で「max_events = 0」を検出する。
+
+[analysis]
+snapshot_mode = "always"
+timezone = ""
+threads = 0
+follow_symlinks = false
+
+[limits]
+max_files = 100000
+max_recursion_depth = 64
+max_evidence_file_size_bytes = 34359738368
+max_snapshot_total_bytes = 1099511627776
+max_events = 0
+max_issues = 100000
+max_issues_per_evidence = 10000
+max_findings = 1000000
+max_correlation_matches_per_rule = 100000
+max_correlation_window_seconds = 86400
+max_yara_scan_file_size_bytes = 1073741824
+max_rule_files = 100000
+max_rule_file_size_bytes = 16777216
+max_memory_bytes = 2147483648

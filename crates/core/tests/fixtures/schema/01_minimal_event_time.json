@@ -1,0 +1,13 @@
+{
+  "_comment": "Schema §9 fixture #1: 各 record type の最小 valid sample（EventTime の utc_instant 最小形）",
+  "expect": "valid",
+  "instance": {
+    "type": "utc_instant",
+    "value": "2026-08-10T01:15:20Z",
+    "original": null,
+    "kind": "event_logged",
+    "precision": "second",
+    "timezone_source": "artifact_defined",
+    "uncertainty_ms": null
+  }
+}

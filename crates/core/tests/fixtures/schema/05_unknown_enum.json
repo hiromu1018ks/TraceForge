@@ -1,0 +1,14 @@
+{
+  "_comment": "Schema §9 fixture #5: unknown enum sample（kind が未知値）",
+  "expect": "invalid",
+  "schema": "event_time",
+  "instance": {
+    "type": "utc_instant",
+    "value": "2026-08-10T01:15:20Z",
+    "original": null,
+    "kind": "nonsense_kind",
+    "precision": "second",
+    "timezone_source": "artifact_defined",
+    "uncertainty_ms": null
+  }
+}

@@ -67,4 +67,12 @@ mise でローカル環境を管理する場合は `.mise.toml` でバージョ�
 CI（`.github/workflows/ci.yml`）は push / pull_request で上記を自動実行する。
 fuzz target の link は Windows MSVC 環境で失敗する（libfuzzer-sys のエントリポイント制約）ため、Linux CI で担保する。
 
+### 依存構成（Phase 1 更新）
+
+- workspace 共通依存はルート `Cargo.toml` の `[workspace.dependencies]` へ一元管理し、各 crate は `<dep>.workspace = true` で継承する。version は `Cargo.lock` へ pin され、cargo-deny で再現性と供給連鎖安全を担保する。
+- `tf-core` が Phase 1 で追加した依存: `sha2`（SHA-256）、`hex`（lowercase hex）、`serde` / `serde_json`（canonical JSON・Case JSON）、`jsonschema`（Draft 2020-12、default-features を切って `draft202012` のみ有効化・外部通信なし）、`chrono` / `chrono-tz`（EventTime・IANA timezone・DST）、`toml`（設定 load）、`thiserror`（Error 型 derive）。
+- dev-dependencies: `proptest`（property test、`tests/property_tests.rs`）と `criterion`（benchmark）。
+- `deny.toml` の許可ライセンスへ `MIT-0`（MIT No Attribution）を追加した。`jsonschema` の依存 `borrow-or-share` が同ライセンスのため。
+- `tf-core` の統合テストは `crates/core/tests/` 配下（`schema_fixtures.rs`・`property_tests.rs`）。Schema §9 fixture は `crates/core/tests/fixtures/schema/` へ保存する。
+
 **ビルド・test・lint 等のコマンドや構成を新規導入・変更したら、その時点で本ファイルへ追記・更新すること。**

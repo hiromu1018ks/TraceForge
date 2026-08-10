@@ -10,10 +10,25 @@ publish.workspace = true
 [lints]
 workspace = true
 
-# criterion benchmark 雏形（T0-011、F-026）。
-# Phase 1 以降で各関数の benchmark を追加する。
+[dependencies]
+# 決定的 ID・digest（T1-001〜T1-007、規範 §12）
+sha2.workspace = true
+hex.workspace = true
+# canonical JSON・Schema 検証・Case JSON 読み書き（T1-050〜T1-056）
+serde.workspace = true
+serde_json.workspace = true
+jsonschema.workspace = true
+# 時刻モデル（T1-010〜T1-016、規範 §6）。DateTime<Utc>/NaiveDateTime と IANA timezone。
+chrono.workspace = true
+chrono-tz.workspace = true
+# TOML 設定 load（T1-060〜T1-063、Schema §8）
+toml.workspace = true
+# Error 型 derive（T1-070〜T1-072、規範 §17）
+thiserror.workspace = true
+
 [dev-dependencies]
 criterion = { version = "0.5", default-features = false }
+proptest.workspace = true
 
 [[bench]]
 name = "smoke"

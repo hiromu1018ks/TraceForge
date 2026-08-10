@@ -1,0 +1,47 @@
+{
+  "_comment": "Schema §9 fixture #6: unknown timezone / range / unknown time sample。3パターンを格納。",
+  "expect": "valid",
+  "schema": "event_time",
+  "instances": [
+    {
+      "type": "local_time",
+      "value": "2026-08-10T01:15:20",
+      "timezone": null,
+      "original": null,
+      "kind": "observed",
+      "precision": "second",
+      "timezone_source": "unknown",
+      "uncertainty_ms": null
+    },
+    {
+      "type": "range",
+      "start": "2026-08-10T01:15:20Z",
+      "end": null,
+      "original": null,
+      "kind": "observed",
+      "precision": "second",
+      "timezone_source": "artifact_defined",
+      "uncertainty_ms": null
+    },
+    {
+      "type": "unknown",
+      "original": null,
+      "kind": "unknown",
+      "precision": "unknown",
+      "timezone_source": "unknown",
+      "uncertainty_ms": null
+    },
+    {
+      "_comment": "range の start/end 両方 null は Schema §4 で禁止",
+      "expect": "invalid",
+      "type": "range",
+      "start": null,
+      "end": null,
+      "original": null,
+      "kind": "unknown",
+      "precision": "unknown",
+      "timezone_source": "unknown",
+      "uncertainty_ms": null
+    }
+  ]
+}

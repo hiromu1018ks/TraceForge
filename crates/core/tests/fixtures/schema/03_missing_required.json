@@ -1,0 +1,10 @@
+{
+  "_comment": "Schema §9 fixture #3: 必須 field 欠落 sample（Correlation Rule で severity/sequence/within/partition_by/score 欠落）",
+  "expect": "invalid",
+  "schema": "correlation_rule",
+  "instance": {
+    "id": "TF-CORR-001",
+    "version": "1.0.0",
+    "title": "missing required fields"
+  }
+}
