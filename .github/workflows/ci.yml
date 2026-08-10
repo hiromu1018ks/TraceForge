@@ -1,0 +1,103 @@
+# TraceForge CI（T0-003、roadmap §5 Phase 0 完了条件: 空実装で CI が通る）
+#
+# ジョブ構成（互換性仕様書 §11 の toolchain version 固定・依存 pin を前提）:
+#   fmt    - cargo fmt --all --check
+#   clippy - cargo clippy（default-members、-D warnings）
+#   test   - cargo test（default-members）
+#   doc    - cargo doc --no-deps（default-members、-D warnings）
+#   deny   - cargo deny check（advisories / licenses / bans / sources）
+#   fuzz   - fuzz target のビルド検証（libfuzzer-sys、F-025）
+#   bench  - criterion benchmark のビルド検証（--no-run、F-026）
+#
+# toolchain は rust-toolchain.toml（stable 1.97.1）へ一任する。
+# `rustup show` で rust-toolchain.toml の解決と components インストールをトリガする。
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  fmt:
+    name: cargo fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust (rust-toolchain.toml)
+        run: rustup show
+      - name: cargo fmt --all --check (workspace)
+        run: cargo fmt --all --check
+      - name: cargo fmt --check (fuzz)
+        run: cargo fmt --manifest-path fuzz/Cargo.toml --check
+
+  clippy:
+    name: cargo clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust (rust-toolchain.toml)
+        run: rustup show
+      - name: cargo clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+  test:
+    name: cargo test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust (rust-toolchain.toml)
+        run: rustup show
+      - name: cargo test
+        run: cargo test
+
+  doc:
+    name: cargo doc
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust (rust-toolchain.toml)
+        run: rustup show
+      - name: cargo doc
+        run: cargo doc --no-deps
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+
+  deny:
+    name: cargo deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust (rust-toolchain.toml)
+        run: rustup show
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
+      - name: cargo deny check
+        run: cargo deny check
+
+  fuzz:
+    name: fuzz build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust (rust-toolchain.toml)
+        run: rustup show
+      - name: Build fuzz targets
+        run: cargo build --manifest-path fuzz/Cargo.toml
+
+  bench:
+    name: bench build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust (rust-toolchain.toml)
+        run: rustup show
+      - name: cargo bench --no-run
+        run: cargo bench --no-run

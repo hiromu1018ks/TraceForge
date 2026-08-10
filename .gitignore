@@ -1,9 +1,9 @@
 # Rust ビルド成果物
 /target/
 
-# cargo ロックファイルはバイナリプロジェクトではコミット推奨だが、
-# 現状は未実装のため有効化。workspace 確立後に方針確定。
-# /Cargo.lock
+# Cargo.lock はコミット対象（T0-005）。
+# TraceForge はバイナリ crate（cli）を含む workspace であり、
+# 互換性仕様書 §11 により依存 pin を徹底して再現性を保証するため、バージョン管理する。
 
 # IDE・エディタ
 /.idea/
@@ -31,4 +31,8 @@ Desktop.ini
 # fuzzing / benchmark 一時成果物
 /fuzz/artifacts/
 /fuzz/corpus/
+# fuzz crate は workspace 外の独立 crate であり、lock と target は
+# 環境依存で変わるためバージョン管理しない（cargo-fuzz 標準）。
+/fuzz/Cargo.lock
+/fuzz/target/
 /criterion/

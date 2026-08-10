@@ -39,6 +39,31 @@ TraceForge — Windows フォレンジック Timeline & Evidence Correlation Eng
 
 ## コマンド
 
-まだ toolchain・ビルド設定が存在しない（Phase 0 未着手）。
-Phase 0 で導入するもの: Cargo workspace、`rust-toolchain.toml`、CI（fmt / clippy / test / doc）、cargo-deny、cargo-fuzz、criterion。
+Phase 0 でプロジェクト基盤を導入済み（Rust 1.97.1、`rust-toolchain.toml` 固定）。
+mise でローカル環境を管理する場合は `.mise.toml` でバージョンを指定し、`rust-toolchain.toml` と一致させる。
+
+### ビルド・テスト・Lint
+
+| 操作 | コマンド |
+|---|---|
+| フォーマット確認（workspace） | `cargo fmt --all --check` |
+| フォーマット確認（fuzz crate） | `cargo fmt --manifest-path fuzz/Cargo.toml --check` |
+| 自動フォーマット | `cargo fmt --all` |
+| Lint（警告をエラー扱い） | `cargo clippy --all-targets -- -D warnings` |
+| テスト | `cargo test` |
+| ドキュメント生成 | `cargo doc --no-deps` |
+| ビルド | `cargo build --workspace` |
+
+### 品質ゲート
+
+| 操作 | コマンド |
+|---|---|
+| cargo-deny（license・advisory・bans・sources） | `cargo deny check` |
+| criterion benchmark ビルド | `cargo bench --no-run` |
+| fuzz ビルド | `cargo build --manifest-path fuzz/Cargo.toml` |
+| fuzz チェック（link 不要） | `cargo check --manifest-path fuzz/Cargo.toml` |
+
+CI（`.github/workflows/ci.yml`）は push / pull_request で上記を自動実行する。
+fuzz target の link は Windows MSVC 環境で失敗する（libfuzzer-sys のエントリポイント制約）ため、Linux CI で担保する。
+
 **ビルド・test・lint 等のコマンドや構成を新規導入・変更したら、その時点で本ファイルへ追記・更新すること。**

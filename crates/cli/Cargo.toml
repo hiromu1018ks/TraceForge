@@ -1,0 +1,13 @@
+[package]
+name = "tf-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+# Phase 0 では依存なし。Phase 7 で clap 等を追加する。

@@ -1,0 +1,7 @@
+# mise ローカル開発環境設定
+#
+# ツールチェーンの正本は rust-toolchain.toml（rustup 標準・CI 兼用）。
+# 本ファイルは mise の shim アクティベーション用に同じバージョンを明示する。
+# バージョン更新時は rust-toolchain.toml と本ファイルを同時に更新すること。
+[tools]
+rust = "1.97.1"

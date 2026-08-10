@@ -1,0 +1,29 @@
+[package]
+name = "tf-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+# cargo-fuzz が本 crate を fuzz package として認識するための印。
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+# tf-core の関数を fuzz 対象とする。
+# Phase 1 以降で対象を追加するまで、本依存は宣言のみで実際の呼出はない。
+tf-core = { path = "../crates/core" }
+
+# cargo-fuzz 雏形 target（T0-010、F-025、製品 §13.1）。
+# Phase 1 以降で core の各関数（決定的 ID・Windows path・canonical JSON 等）の
+# fuzz target を追加する。
+[[bin]]
+name = "core"
+path = "fuzz_targets/core.rs"
+test = false
+doc = false
+
+# 親 workspace から独立した fuzz 専用 workspace とする。
+# cargo-fuzz は libfuzzer-sys を用い、fuzz target のビルド要件が
+# メイン workspace と異なるため、fmt/clippy/test/doc の対象から切り離す。
+[workspace]

@@ -1,0 +1,8 @@
+# Rust ツールチェーン固定（互換性仕様書 §11: 各 release は Rust toolchain version を保存する）
+# rustup 互換ファイル。mise は本ファイルを idiomatic version file として自動認識する。
+[toolchain]
+channel = "1.97.1"
+# CI（fmt / clippy / test / doc）で必要な成分だけを最小 profile へ追加し、
+# CI の高速化と再現性を両立させる。rustdoc は rustc 標準搭載。
+profile = "minimal"
+components = ["rustfmt", "clippy"]

@@ -27,18 +27,18 @@
 
 ### 3.1 Workspace とツール
 
-- [ ] T0-001 Cargo workspace 作成（`core` / `evidence` / `store` / `parsers` / `engines` / `findings` / `export` / `cli` の crate 分割案）
-- [ ] T0-002 `rust-toolchain.toml` で toolchain version を固定（互換 §11）
-- [ ] T0-003 CI 構築（fmt / clippy / test / doc の各 job）
-- [ ] T0-004 cargo-deny 導入（license 一覧・security advisory チェック、互換 §11）
-- [ ] T0-005 `Cargo.lock` をコミット対象とし、binary crate で pin を徹底（互換 §7・§11）
+- [x] T0-001 Cargo workspace 作成（`core` / `evidence` / `store` / `parsers` / `engines` / `findings` / `export` / `cli` の crate 分割案）
+- [x] T0-002 `rust-toolchain.toml` で toolchain version を固定（互換 §11）
+- [x] T0-003 CI 構築（fmt / clippy / test / doc の各 job）
+- [x] T0-004 cargo-deny 導入（license 一覧・security advisory チェック、互換 §11）
+- [x] T0-005 `Cargo.lock` をコミット対象とし、binary crate で pin を徹底（互換 §7・§11）
 
 ### 3.2 検証環境
 
-- [ ] T0-010 cargo-fuzz 雛形作成（F-025、製品 §13.1）
-- [ ] T0-011 criterion benchmark 雛形作成（F-026）
-- [ ] T0-012 fixture 管理方針の策定（配置、SHA-256・生成 OS・取得方法の記録形式、互換 §12-5）
-- [ ] T0-013 fixture 収集計画の開始（Win 7 SP1 / 10 22H2 / 11 24H2 実環境、互換 §4）
+- [x] T0-010 cargo-fuzz 雛形作成（F-025、製品 §13.1）
+- [x] T0-011 criterion benchmark 雛形作成（F-026）
+- [x] T0-012 fixture 管理方針の策定（配置、SHA-256・生成 OS・取得方法の記録形式、互換 §12-5）
+- [x] T0-013 fixture 収集計画の開始（Win 7 SP1 / 10 22H2 / 11 24H2 実環境、互換 §4）
 
 ---
 

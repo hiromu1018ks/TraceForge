@@ -1,0 +1,47 @@
+# TraceForge ルート workspace 定義
+#
+# 8 crate 構成（roadmap §5 Phase 0 の crate 分割案）:
+#   core      - データモデル・決定的 ID・時刻・Windows path・Schema（Phase 1）
+#   evidence  - discovery・snapshot・SHA-256・Artifact 識別（Phase 2）
+#   store     - Event Store・決定的 iteration・Timeline（Phase 3）
+#   parsers   - 7 種 Parser と framework（Phase 4）
+#   engines   - Sigma・YARA-X・Correlation 検知（Phase 5）
+#   findings  - Finding 統合・ATT&CK mapping（Phase 6）
+#   export    - 6 出力形式（Phase 7）
+#   cli       - 9 command エントリポイント（Phase 7）
+#
+# Phase 0 では各 crate を空実装で作成し、CI（fmt/clippy/test/doc）が通ることを確認する。
+
+[workspace]
+resolver = "3"
+members = [
+    "crates/core",
+    "crates/evidence",
+    "crates/store",
+    "crates/parsers",
+    "crates/engines",
+    "crates/findings",
+    "crates/export",
+    "crates/cli",
+]
+
+# workspace 共通の package metadata。各 crate は `.workspace = true` で継承する。
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+authors = ["TraceForge Contributors"]
+repository = "https://github.com/hiromu1018ks/TraceForge"
+description = "Windows Forensic Timeline & Evidence Correlation Engine"
+publish = false
+
+# TraceForge 自体の license は別途決定するまで各 crate へ license 宣言を行わない。
+# 依存 crate の license は deny.toml（cargo-deny）で許可リストを運用する。
+
+# 共通 lint 設定。各 crate は [lints] workspace = true で継承する。
+# TraceForge は安全性・決定性を重視するため、clippy の全 lint を warning 扱いで有効化。
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+# 共通依存。Phase 0 では外部依存なし。Phase 1 以降で追加する。
+[workspace.dependencies]

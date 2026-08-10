@@ -1,0 +1,50 @@
+# cargo-deny 設定（T0-004、互換性仕様書 §11: license・security advisory チェック）
+#
+# 実行: cargo deny check
+# CI の deny job で advisories・licenses・bans・sources を検証する。
+# TraceForge は依存 pin と再現性を保証するため、全 release で本チェックを通す（互換 §11）。
+
+[graph]
+all-features = true
+
+[advisories]
+# RustSec セキュリティ advisory データベース。
+db-urls = ["https://github.com/rustsec/advisory-db"]
+# yanked crate は再現性を損なうため拒否する。
+yanked = "deny"
+
+[licenses]
+# publish=false の自作 crate（tf-*）は license チェック対象外。
+# TraceForge 自体の license は別途決定するまで各 crate へ宣言しない。
+private = { ignore = true }
+# 外部依存 crate に許可する license。
+# copyleft（GPL 等）は配布形態へ影響するため、既定で拒否する（互換 §11）。
+# Phase 0 では依存が criterion（dev）・libfuzzer-sys（fuzz）のみのため、
+# 許可リストの一部 license が未使用となり cargo-deny が
+# license-not-encountered 警告を出す。Phase 1 以降の依存追加で解消される。
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "Zlib",
+    "0BSD",
+    "CC0-1.0",
+]
+confidence-threshold = 0.8
+
+[bans]
+# 重複依存（multiple-versions）は警告レベルで運用し、Phase 1 以降で厳格化する。
+multiple-versions = "warn"
+# crate 名のワイルドカード指定（path 依存以外の "*"）は禁止。
+wildcards = "deny"
+
+[sources]
+# crates.io 以外の registry・git 依存を禁止する（再現性と供給連鎖安全）。
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
