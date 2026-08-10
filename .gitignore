@@ -1,0 +1,34 @@
+# Rust ビルド成果物
+/target/
+
+# cargo ロックファイルはバイナリプロジェクトではコミット推奨だが、
+# 現状は未実装のため有効化。workspace 確立後に方針確定。
+# /Cargo.lock
+
+# IDE・エディタ
+/.idea/
+/.vscode/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# ローカル環境
+.env
+.env.local
+
+# センシティブ（forensic 対象データを誤ってコミットしない）
+*.dmp
+*.evtx
+*.vmdk
+*.raw
+*.dd
+*.img
+
+# fuzzing / benchmark 一時成果物
+/fuzz/artifacts/
+/fuzz/corpus/
+/criterion/
