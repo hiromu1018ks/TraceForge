@@ -67,3 +67,5 @@ toml = "0.8"
 thiserror = "1"
 # property test（T1-008、T1-016、T1-032 等）
 proptest = "1"
+# Unicode NFC 正規化（T2-001、規範 §5.2: source_locator の NFC 正規化）
+unicode-normalization = "0.1"

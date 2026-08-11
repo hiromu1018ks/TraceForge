@@ -118,46 +118,46 @@
 
 ### 5.1 Discovery
 
-- [ ] T2-001 `source_locator` 正規化（`/` separator、`.`/`..` 禁止、NFC、`%XX` escape、規範 §5.2）
-- [ ] T2-002 決定的列挙（UTF-8 byte 昇順 sort、filesystem 順非依存、規範 §5.3）
-- [ ] T2-003 symlink skip + `TF-W-DISCOVERY-SYMLINK` 記録（規範 §5.3）
-- [ ] T2-004 symlink loop 非追跡 test（規範 §21-10）
-- [ ] T2-005 recursive traversal（既定 ON、深度制限 `max_recursion_depth`、Schema §8.2）
-- [ ] T2-006 対象外入力の検出・拒否（disk image / container / archive 展開禁止、互換 §3）
+- [x] T2-001 `source_locator` 正規化（`/` separator、`.`/`..` 禁止、NFC、`%XX` escape、規範 §5.2）
+- [x] T2-002 決定的列挙（UTF-8 byte 昇順 sort、filesystem 順非依存、規範 §5.3）
+- [x] T2-003 symlink skip + `TF-W-DISCOVERY-SYMLINK` 記録（規範 §5.3）
+- [x] T2-004 symlink loop 非追跡 test（規範 §21-10）
+- [x] T2-005 recursive traversal（既定 ON、深度制限 `max_recursion_depth`、Schema §8.2）
+- [x] T2-006 対象外入力の検出・拒否（disk image / container / archive 展開禁止、互換 §3）
 
 ### 5.2 Snapshot と hash
 
-- [ ] T2-010 read-only・symlink 非追跡 open（規範 §5.5-1）
-- [ ] T2-011 before/after メタデータ取得（size・mtime・file identity、規範 §5.5-2/6）
-- [ ] T2-012 private temporary directory への snapshot 作成（規範 §5.5-3、所有者限定権限 §10）
-- [ ] T2-013 固定長 buffer コピー + 同時 SHA-256（規範 §5.5-4）
-- [ ] T2-014 snapshot flush + read-only 再 open（規範 §5.5-5）
-- [ ] T2-015 `ChangedDuringSnapshot` / `SnapshotFailed` 処理（規範 §5.5-7、§5.5 終盤）
-- [ ] T2-016 snapshot size・SHA-256 再検証（規範 §5.5-8）
-- [ ] T2-017 `VerifiedSnapshot` 以外から Event/YARA Match を生成しない強制（規範 §5.5）
-- [ ] T2-018 snapshot 中書換 test で Event 非生成（規範 §21-3）
-- [ ] T2-019 Parser 読取 bytes と snapshot SHA-256 一致 test（規範 §21-4）
+- [x] T2-010 read-only・symlink 非追跡 open（規範 §5.5-1）
+- [x] T2-011 before/after メタデータ取得（size・mtime・file identity、規範 §5.5-2/6）
+- [x] T2-012 private temporary directory への snapshot 作成（規範 §5.5-3、所有者限定権限 §10）
+- [x] T2-013 固定長 buffer コピー + 同時 SHA-256（規範 §5.5-4）
+- [x] T2-014 snapshot flush + read-only 再 open（規範 §5.5-5）
+- [x] T2-015 `ChangedDuringSnapshot` / `SnapshotFailed` 処理（規範 §5.5-7、§5.5 終盤）
+- [x] T2-016 snapshot size・SHA-256 再検証（規範 §5.5-8）
+- [x] T2-017 `VerifiedSnapshot` 以外から Event/YARA Match を生成しない強制（規範 §5.5）
+- [x] T2-018 snapshot 中書換 test で Event 非生成（規範 §21-3）
+- [x] T2-019 Parser 読取 bytes と snapshot SHA-256 一致 test（規範 §21-4）
 
 ### 5.3 入出力分離
 
-- [ ] T2-020 出力 path の入力重複・hard link 検査（Exit Code 4、規範 §5.4）
-- [ ] T2-021 input directory 内 output 拒否 test（規範 §21-9）
-- [ ] T2-022 overwrite 既定禁止・`--overwrite` 時のみ通常 file 置換・symlink 常時拒否（規範 §5.4）
+- [x] T2-020 出力 path の入力重複・hard link 検査（Exit Code 4、規範 §5.4）
+- [x] T2-021 input directory 内 output 拒否 test（規範 §21-9）
+- [x] T2-022 overwrite 既定禁止・`--overwrite` 時のみ通常 file 置換・symlink 常時拒否（規範 §5.4）
 
 ### 5.4 Artifact 識別
 
-- [ ] T2-030 probe framework（filename / known path / magic / header / parser probe、規範 §11）
-- [ ] T2-031 `ProbeResult` 5値実装（Confirmed / Probable / UnsupportedVersion / NotThisFormat / Malformed）
-- [ ] T2-032 複数 Confirmed の許可組合せ管理・ambiguous skip（規範 §11）
-- [ ] T2-033 Probable のみ既定 skip + Warning（規範 §11）
-- [ ] T2-034 Evidence → 複数 ArtifactInstance 対応（Amcache hive の例、規範 §5.1）
+- [x] T2-030 probe framework（filename / known path / magic / header / parser probe、規範 §11）
+- [x] T2-031 `ProbeResult` 5値実装（Confirmed / Probable / UnsupportedVersion / NotThisFormat / Malformed）
+- [x] T2-032 複数 Confirmed の許可組合せ管理・ambiguous skip（規範 §11）
+- [x] T2-033 Probable のみ既定 skip + Warning（規範 §11）
+- [x] T2-034 Evidence → 複数 ArtifactInstance 対応（Amcache hive の例、規範 §5.1）
 
 ### 5.5 Resource limit
 
-- [ ] T2-040 limit framework（事前 limit は開始前、逐次 limit は追加直前検査、規範 §18）
-- [ ] T2-041 limit 到達時の5動作（停止・`TF-W-LIMIT-*`・`complete=false`・Exit Code・黙殺禁止、規範 §18）
-- [ ] T2-042 Schema §8.2 の全 limit 項目の適用点実装
-- [ ] T2-043 `max_snapshot_total_bytes` 管理（規範 §5.5、Schema §8.2）
+- [x] T2-040 limit framework（事前 limit は開始前、逐次 limit は追加直前検査、規範 §18）
+- [x] T2-041 limit 到達時の5動作（停止・`TF-W-LIMIT-*`・`complete=false`・Exit Code・黙殺禁止、規範 §18）
+- [x] T2-042 Schema §8.2 の全 limit 項目の適用点実装
+- [x] T2-043 `max_snapshot_total_bytes` 管理（規範 §5.5、Schema §8.2）
 
 ---
 

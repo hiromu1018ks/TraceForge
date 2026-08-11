@@ -9,3 +9,19 @@ publish.workspace = true
 
 [lints]
 workspace = true
+
+[dependencies]
+# Phase 1 のコアデータモデル（EvidenceItem・Issue・Config・Error 等）を再利用
+tf-core = { path = "../core", version = "0.1.0" }
+# snapshot 中の同時 SHA-256 計算（規範 §5.5-4）
+sha2.workspace = true
+# SHA-256 digest の lowercase hex 変換（規範 §5.5-4・Schema §2.1）
+hex.workspace = true
+# source_locator の NFC 正規化（規範 §5.2）
+unicode-normalization.workspace = true
+# Error 型 derive（規範 §17）
+thiserror.workspace = true
+
+[dev-dependencies]
+# テスト用一時 directory（統合テスト §21-3/9/10）
+tempfile = "3"
