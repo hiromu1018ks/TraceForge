@@ -69,3 +69,8 @@ thiserror = "1"
 proptest = "1"
 # Unicode NFC 正規化（T2-001、規範 §5.2: source_locator の NFC 正規化）
 unicode-normalization = "0.1"
+# YARA-X ファイルパターン scan（Phase 5 YARA-X 編 T5-020、互換 §7）
+# default features（default-modules 含む）を有効化し、一般的な forensic YARA Rule との互換性を確保する。
+# version は Cargo.lock へ pin され、cargo-deny で再現性と供給連鎖安全を担保する（互換 §7・§11）。
+# `latest` 使用禁止（互換 §7）・固定 version を Manifest へ記録する。
+yara-x = "1.19"

@@ -12,6 +12,27 @@ all-features = true
 db-urls = ["https://github.com/rustsec/advisory-db"]
 # yanked crate は再現性を損なうため拒否する。
 yanked = "deny"
+# unmaintained（開発停止）advisory は workspace 直依存のみ error とする。
+# yara-x が間接依存する bincode 等の「メンテナンス停止」は本プロジェクトの
+# 脅威モデルへ直接影響しないため、transitive な停止報告は警告に留める。
+unmaintained = "workspace"
+# Phase 5 YARA-X 編（T5-020）で導入した yara-x v1.19.0 の間接依存に起因する
+# advisory のうち、本プロジェクトの脅威モデル（offline forensic tool・外部通信なし・
+# 信頼できない Rule は読込前に compile error 処理）へ影響しないものを明示的に例外とする。
+# 各理由は advisory ID 毎に記載し、新 version の yara-x で解消されたら除外する。
+ignore = [
+    # rsa 0.9.10: Marvin Attack（timing side-channel）。network 越しの観察が必要。
+    # TraceForge は offline forensic tool であり、rsa は yara-x の pe/macho/dotnet
+    # module 経由で署名検証に使われるのみ。network exposure はない。
+    # 上位の yara-x が修正版 rsa へ依存するまで例外とする。
+    { id = "RUSTSEC-2023-0071", reason = "offline forensic tool では network timing 観測不可。yara-x v1.19.0 が間接依存（pe/macho/dotnet module の署名検証用）。yara-x の更新で解消予定" },
+    # wasmtime 43.0.2: type indices mixing（複数 engine 間の型混同）。
+    # yara-x は単一の内部 engine で YARA rule 条件をコンパイル・実行するため、
+    # 複数 engine 間の型混同は発生しない。yara-x v1.19.0 は wasmtime = "43.0.2"
+    # へ hard-pin しており、本プロジェクトから独立に update できない。
+    # yara-x が wasmtime >= 47.0.3 へ移行したら解消される。
+    { id = "RUSTSEC-2026-0222", reason = "yara-x 内部の単一 engine 使用のみ。yara-x v1.19.0 が wasmtime 43.0.2 へ hard-pin しており個別 update 不可" },
+]
 
 [licenses]
 # publish=false の自作 crate（tf-*）は license チェック対象外。

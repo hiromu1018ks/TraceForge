@@ -21,6 +21,8 @@ hex.workspace = true
 thiserror.workspace = true
 # Sigma 評価で Event 属性値（serde_json::Value）へのアクセス・Match の JSON 構築に必要
 serde_json.workspace = true
+# YARA-X compiler・scanner（Phase 5 YARA-X 編 T5-020、互換 §7・規範 §15.2）
+yara-x.workspace = true
 
 [dev-dependencies]
 # テスト用一時 directory（Rule directory 構築・dedup 検証等）

@@ -298,14 +298,14 @@
 
 ### 8.3 YARA-X
 
-- [ ] T5-020 YARA-X crate pin + Cargo.lock checksum 記録（互換 §7）
-- [ ] T5-021 `.yar`/`.yara` file・directory 再帰 load（互換 §7）
-- [ ] T5-022 tags/meta/namespace/matched pattern identifier 保持（互換 §7、Schema §5.7）
-- [ ] T5-023 compile error 時の file 全体無効化・他 file 継続（規範 §15.2）
-- [ ] T5-024 Verified Snapshot のみ scan（実行・load 禁止、規範 §15.2）
-- [ ] T5-025 `all / suspicious / explicit` mode（Schema §8.3、規範 §15.2）
-- [ ] T5-026 suspicious mode の Evidence ID 解決（host path 推測 scan 禁止、規範 §15.2、§21-13）
-- [ ] T5-027 `max_yara_scan_file_size_bytes` 適用（Schema §8.2）
+- [x] T5-020 YARA-X crate pin + Cargo.lock checksum 記録（互換 §7）
+- [x] T5-021 `.yar`/`.yara` file・directory 再帰 load（互換 §7）
+- [x] T5-022 tags/meta/namespace/matched pattern identifier 保持（互換 §7、Schema §5.7）
+- [x] T5-023 compile error 時の file 全体無効化・他 file 継続（規範 §15.2）
+- [x] T5-024 Verified Snapshot のみ scan（実行・load 禁止、規範 §15.2）
+- [x] T5-025 `all / suspicious / explicit` mode（Schema §8.3、規範 §15.2）
+- [x] T5-026 suspicious mode の Evidence ID 解決（host path 推測 scan 禁止、規範 §15.2、§21-13）
+- [x] T5-027 `max_yara_scan_file_size_bytes` 適用（Schema §8.2）
 
 ### 8.4 Correlation
 

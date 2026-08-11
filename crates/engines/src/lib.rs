@@ -20,6 +20,7 @@ pub mod loader;
 pub mod path_norm;
 pub mod sigma;
 pub mod yaml;
+pub mod yara;
 
 pub use loader::{
     DiscoveredRuleFile, DiscoveryOutcome, LoadedRuleFile, MAX_RULE_FILES_LIMIT_CODE,
@@ -29,3 +30,10 @@ pub use loader::{
 pub use path_norm::{RulePathError, normalize_rule_relative_path};
 pub use sigma::evaluator::{CompiledSigmaRule, SigmaMatchResult};
 pub use sigma::rule::{SigmaError, SigmaRule};
+pub use yara::compiler::yara_x_engine_version;
+pub use yara::{
+    CompiledYaraFile, ModeResolutionWarning, YaraCompileError, YaraCompileErrorDetail,
+    YaraEvidenceScanTarget, YaraMatchResult, YaraPatternInfo, YaraRuleset,
+    YaraRulesetCompileSummary, YaraScanMode, YaraScanResults, YaraScanner, build_yara_match,
+    select_evidence_for_mode,
+};
