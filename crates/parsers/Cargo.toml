@@ -9,3 +9,21 @@ publish.workspace = true
 
 [lints]
 workspace = true
+
+[dependencies]
+# Phase 1 のコアデータモデル（Event・Provenance・RecordLocator・Issue・ArtifactSource・Error 型）
+tf-core = { path = "../core", version = "0.1.0" }
+# Phase 2 の EvidenceItem・ProbeResult・probe framework（規範 §9.1 の ArtifactParser::probe 用）
+tf-evidence = { path = "../evidence", version = "0.1.0" }
+# Phase 3 の EventStore（EventStoreSink が ParseSink へ Event を流し込む、規範 §9.1・§10）
+tf-store = { path = "../store", version = "0.1.0" }
+# canonical JSON の attributes 構築（Parser が BTreeMap<String, Value> を組み立てる）
+serde_json.workspace = true
+# FILETIME → DateTime<Utc> 変換（LNK header timestamps、MS-SHLLINK §2.1.3）
+chrono.workspace = true
+# SinkError・ParseError の derive（規範 §17）
+thiserror.workspace = true
+
+[dev-dependencies]
+# テスト用一時 directory（fixture file・EventStore spool file 等）
+tempfile = "3"

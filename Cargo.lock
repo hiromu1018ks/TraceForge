@@ -1247,6 +1247,15 @@ version = "0.1.0"
 [[package]]
 name = "tf-parsers"
 version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde_json",
+ "tempfile",
+ "tf-core",
+ "tf-evidence",
+ "tf-store",
+ "thiserror",
+]
 
 [[package]]
 name = "tf-store"

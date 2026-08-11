@@ -1,5 +1,29 @@
 //! TraceForge Parser 群 crate。
 //!
-//! Phase 4 で 7 種 Parser を互換性仕様の acceptance 品質で実装する:
-//! - Parser framework（`ArtifactParser` / `ParseSink` trait、規範 §9）
-//! - LNK / Prefetch / USN Journal / EVTX / Registry / Amcache / Jump Lists（互換 §4）
+//! Phase 4 で 7 種 Parser を互換性仕様の acceptance 品質で実装する（roadmap §5 Phase 4）:
+//! - Parser framework（[`framework`]・[`issue`]・[`sink`]、規範 §9）
+//! - LNK（[`lnk`]、[MS-SHLLINK]、互換 §4.4）— M2 縦割りスライス対象
+//! - 残り6種（Prefetch / USN / EVTX / Registry / Amcache / Jump Lists）は順次追加
+//!
+//! ## 設計の要点
+//!
+//! - **sink 型 interface**: Parser は全 Event を `Vec` で返さず [`framework::ParseSink`] へ
+//!   1件ずつ出力する（規範 §9.1・§21-6）。
+//! - **panic 境界**: [`framework::run_parser_catching_panic`] が Parser 内の panic を捕捉し、
+//!   Fatal issue + [`framework::ParseSummary::failed`] へ変換する（規範 §9.4）。
+//! - **観測型 Event**: 観測していない行為を Event type で断定しない（規範 §7.1）。
+//!   例えば LNK の timestamp は `lnk_timestamp`（観測）であり、`file_opened` 等の断定ではない。
+//! - **EventStoreSink**: [`sink::EventStoreSink`] が [`tf_store::EventStore`] への
+//!   [`framework::ParseSink`] 適応を提供し、Parser → Event Store の縦割りを結ぶ。
+
+pub mod framework;
+pub mod issue;
+pub mod lnk;
+pub mod sink;
+
+// よく使う主要型をルートへ再公開。
+pub use framework::{
+    ArtifactParser, ParseContext, ParseSink, ParseSummary, ReadSeek, SinkError,
+    run_parser_catching_panic,
+};
+pub use lnk::{LnkParser, PARSER_ID as LNK_PARSER_ID, PARSER_VERSION as LNK_PARSER_VERSION};

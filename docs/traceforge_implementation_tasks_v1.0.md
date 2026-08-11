@@ -195,23 +195,23 @@
 
 ### 7.1 Parser framework
 
-- [ ] T4-001 `ArtifactParser` trait + `ParseSink` trait 実装（sink 型 interface、`Vec` 全件返却禁止、規範 §9.1）
-- [ ] T4-002 `ParseSummary` / `ParseStatus` 実装（規範 §9.2）
-- [ ] T4-003 record 破損時の部分成功処理（境界特定可能なら継続、生成済み Event 破棄禁止、規範 §9.2）
-- [ ] T4-004 Parse Issue 仕様実装（安定 code、巨大値・未 escape 制御文字の排除、出力順、規範 §9.3）
-- [ ] T4-005 Parser 境界の panic 捕捉 → Fatal 記録 → Exit Code 10（規範 §9.4）
-- [ ] T4-006 破損中間 record 前後の部分 Event 保持 test（規範 §21-5）
-- [ ] T4-007 必須 field 欠落 record は Event 化せず Issue 化（互換 §5）
+- [x] T4-001 `ArtifactParser` trait + `ParseSink` trait 実装（sink 型 interface、`Vec` 全件返却禁止、規範 §9.1）
+- [x] T4-002 `ParseSummary` / `ParseStatus` 実装（規範 §9.2）
+- [x] T4-003 record 破損時の部分成功処理（境界特定可能なら継続、生成済み Event 破棄禁止、規範 §9.2）
+- [x] T4-004 Parse Issue 仕様実装（安定 code、巨大値・未 escape 制御文字の排除、出力順、規範 §9.3）
+- [x] T4-005 Parser 境界の panic 捕捉 → Fatal 記録 → Exit Code 10（規範 §9.4）
+- [x] T4-006 破損中間 record 前後の部分 Event 保持 test（規範 §21-5）
+- [x] T4-007 必須 field 欠落 record は Event 化せず Issue 化（互換 §5）
 
 ### 7.2 LNK Parser（M2 対象）
 
-- [ ] T4-010 Shell Link Header 解析（size・CLSID・flags・timestamps 検証、互換 §4.4）
-- [ ] T4-011 LinkTargetIDList 解析（境界検証、未知 item raw 保持、互換 §4.4）
-- [ ] T4-012 LinkInfo 解析（互換 §4.4）
-- [ ] T4-013 StringData 解析（互換 §4.4）
-- [ ] T4-014 ExtraData 解析（既知 block + 未知 block skip、互換 §4.4）
-- [ ] T4-015 timestamp kind と元 field 名の保持（互換 §4.4）
-- [ ] T4-016 LNK fixture + acceptance test（互換 §12）
+- [x] T4-010 Shell Link Header 解析（size・CLSID・flags・timestamps 検証、互換 §4.4）
+- [x] T4-011 LinkTargetIDList 解析（境界検証、未知 item raw 保持、互換 §4.4）
+- [x] T4-012 LinkInfo 解析（互換 §4.4）
+- [x] T4-013 StringData 解析（互換 §4.4）
+- [x] T4-014 ExtraData 解析（既知 block + 未知 block skip、互換 §4.4）
+- [x] T4-015 timestamp kind と元 field 名の保持（互換 §4.4）
+- [x] T4-016 LNK fixture + acceptance test（互換 §12）
 
 ### 7.3 Prefetch Parser
 
