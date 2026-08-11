@@ -245,12 +245,12 @@
 
 ### 7.6 Registry Parser
 
-- [ ] T4-050 hive 構造解析（nk/vk 等、SYSTEM/SOFTWARE/SAM/SECURITY/NTUSER.DAT/UsrClass.dat、互換 §4.7）
-- [ ] T4-051 LOG1/LOG2 transaction log replay（replay 成否と log hash 記録、互換 §4.7）
-- [ ] T4-052 dual view（base / recovered）と Provenance 記録（互換 §4.7）
-- [ ] T4-053 replay 不可時は `partial` 扱い（互換 §4.7）
-- [ ] T4-054 観測型 Event（`registry_observation` / `registry_key_last_write`、`registry_set/delete` 禁止、互換 §4.7）
-- [ ] T4-055 Registry fixture + acceptance test（互換 §12）
+- [x] T4-050 hive 構造解析（nk/vk 等、SYSTEM/SOFTWARE/SAM/SECURITY/NTUSER.DAT/UsrClass.dat、互換 §4.7）
+- [x] T4-051 LOG1/LOG2 transaction log replay（replay 成否と log hash 記録、互換 §4.7）
+- [x] T4-052 dual view（base / recovered）と Provenance 記録（互換 §4.7）
+- [x] T4-053 replay 不可時は `partial` 扱い（互換 §4.7）
+- [x] T4-054 観測型 Event（`registry_observation` / `registry_key_last_write`、`registry_set/delete` 禁止、互換 §4.7）
+- [x] T4-055 Registry fixture + acceptance test（互換 §12）
 
 ### 7.7 Amcache Parser
 

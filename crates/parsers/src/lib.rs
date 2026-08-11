@@ -6,7 +6,8 @@
 //! - Prefetch（[`prefetch`]、libyal PF format、互換 §4.1）— MAM 圧縮展開付き
 //! - USN Journal（[`usn`]、Microsoft USN_RECORD_V2/V3/V4、互換 §4.3）— record-stream 型
 //! - EVTX（[`evtx`]、libyal libevtx 仕様、互換 §4.2）— binxml decoder 付き record-stream 型
-//! - 残り3種（Registry / Amcache / Jump Lists）は順次追加
+//! - Registry（[`registry`]、MS-RRMF / libyal libregf、互換 §4.7）— hive 構造 + LOG1/LOG2 dual view
+//! - 残り2種（Amcache / Jump Lists）は順次追加
 //!
 //! ## 設計の要点
 //!
@@ -18,7 +19,9 @@
 //!   例えば LNK の timestamp は `lnk_timestamp`、Prefetch の実行痕跡は
 //!   `prefetch_execution_observed`（観測）であり、`file_opened`・`process_start` 等の断定ではない。
 //!   EVTX も汎用は `event_logged`（観測）とし、typed mapping は channel+provider+必須 field の
-//!   同時検証を満たした場合のみ適用する（互換 §4.2）。
+//!   同時検証を満たした場合のみ適用する（互換 §4.2）。Registry は `registry_observation`
+//!   と `registry_key_last_write`（観測）とし、`registry_set` / `registry_delete` は生成しない
+//!   （互換 §4.7）。
 //! - **EventStoreSink**: [`sink::EventStoreSink`] が [`tf_store::EventStore`] への
 //!   [`framework::ParseSink`] 適応を提供し、Parser → Event Store の縦割りを結ぶ。
 
@@ -27,6 +30,7 @@ pub mod framework;
 pub mod issue;
 pub mod lnk;
 pub mod prefetch;
+pub mod registry;
 pub mod sink;
 pub mod usn;
 
@@ -42,6 +46,11 @@ pub use framework::{
 pub use lnk::{LnkParser, PARSER_ID as LNK_PARSER_ID, PARSER_VERSION as LNK_PARSER_VERSION};
 pub use prefetch::{
     PARSER_ID as PREFETCH_PARSER_ID, PARSER_VERSION as PREFETCH_PARSER_VERSION, PrefetchParser,
+};
+pub use registry::{
+    HiveType, PARSER_ID as REGISTRY_PARSER_ID, PARSER_VERSION as REGISTRY_PARSER_VERSION,
+    REGISTRY_KEY_LAST_WRITE_EVENT_TYPE, REGISTRY_OBSERVATION_EVENT_TYPE, REGISTRY_REFERENCE,
+    RegistryParser,
 };
 pub use usn::{
     PARSER_ID as USN_PARSER_ID, PARSER_VERSION as USN_PARSER_VERSION,

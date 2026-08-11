@@ -867,3 +867,268 @@ pub fn sysmon_operational_spec(computer: &str) -> EventContentSpec {
 pub fn evtx_filetime_from_unix_offset(offset_seconds: i64) -> u64 {
     filetime_from_unix_offset(offset_seconds)
 }
+
+// ============================================================
+// Registry hive fixture（合成・MS-RRMF / libyal libregf 準拠）
+// ============================================================
+
+pub use tf_parsers::registry::hive::REGF_MAGIC as REGISTRY_REGF_MAGIC;
+pub use tf_parsers::registry::log::{
+    LogEntry as RegistryLogEntry, build_synthetic_log as build_registry_synthetic_log,
+};
+
+/// HvLE 形式の magic（テストで "既知だが未対応" LOG の偽造に使う）。
+pub fn registry_hvle_magic() -> [u8; 4] {
+    *b"HvLE"
+}
+
+/// 合成 registry hive の key 仕様（再帰的な subkey を持てる）。
+#[derive(Clone, Debug)]
+pub struct RegistryKeySpec {
+    pub name: String,
+    pub last_write_filetime: u64,
+    pub values: Vec<RegistryValueSpec>,
+    pub subkeys: Vec<RegistryKeySpec>,
+}
+
+/// 合成 registry hive の value 仕様。
+#[derive(Clone, Debug)]
+pub struct RegistryValueSpec {
+    pub name: String,
+    pub data_type: u32,
+    pub data: Vec<u8>,
+}
+
+impl RegistryValueSpec {
+    /// REG_DWORD inline 値を作る（名前付き）。
+    pub fn dword(name: &str, value: u32) -> Self {
+        RegistryValueSpec {
+            name: name.to_string(),
+            data_type: 4,
+            data: value.to_le_bytes().to_vec(),
+        }
+    }
+
+    /// REG_SZ（UTF-16LE）値を作る。
+    pub fn sz(name: &str, value: &str) -> Self {
+        let bytes: Vec<u8> = value.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
+        RegistryValueSpec {
+            name: name.to_string(),
+            data_type: 1,
+            data: bytes,
+        }
+    }
+
+    /// REG_BINARY 値を作る。
+    pub fn binary(name: &str, bytes: Vec<u8>) -> Self {
+        RegistryValueSpec {
+            name: name.to_string(),
+            data_type: 3,
+            data: bytes,
+        }
+    }
+}
+
+impl Default for RegistryKeySpec {
+    fn default() -> Self {
+        RegistryKeySpec {
+            name: "ROOT".to_string(),
+            last_write_filetime: filetime_from_unix_offset(0),
+            values: vec![],
+            subkeys: vec![],
+        }
+    }
+}
+
+/// 合成 registry hive bytes を構築する。
+///
+/// base block (4096 byte) + hive bins data（key tree を直列化したもの）。
+/// 実 Windows 環境の生成物ではないため、fixture 管理方針へは
+/// 「合成（hand-crafted, MS-RRMF / libyal libregf 準拠）」として記録する。
+pub fn build_registry_fixture(root: &RegistryKeySpec) -> Vec<u8> {
+    let mut builder = RegistryFixtureBuilder::new();
+    let root_offset = builder.write_subtree(root);
+    builder.into_bytes_with_root(root_offset)
+}
+
+/// 合成 hive を構築し、root nk の cell offset（hive bins data 先頭からの相対）も返す。
+/// LOG entry で root key の timestamp を書き換える test 等で利用する。
+pub fn build_registry_fixture_with_root_offset(root: &RegistryKeySpec) -> (Vec<u8>, u32) {
+    let mut builder = RegistryFixtureBuilder::new();
+    let root_offset = builder.write_subtree(root);
+    (builder.into_bytes_with_root(root_offset), root_offset)
+}
+
+/// 合成 LOG file bytes を構築する（replay 可能・テスト用）。
+///
+/// base hive bytes と同じ長さの vectr を用意し、指定した位置へ patch を当てた
+/// recovered view を構築できるよう、entries を作る。
+pub fn build_registry_log_fixture(entries: &[RegistryLogEntry]) -> Vec<u8> {
+    build_registry_synthetic_log(entries)
+}
+
+/// 合成 hive の LOG entry を1件構築する helper。
+pub fn registry_log_entry(target_offset: u32, data: Vec<u8>) -> RegistryLogEntry {
+    RegistryLogEntry {
+        target_offset,
+        data,
+    }
+}
+
+/// hive bins 内の cell 配置を順次計算する builder。
+struct RegistryFixtureBuilder {
+    /// base block + bins。base block は最後に先頭へ prepend する。
+    bins: Vec<u8>,
+    /// 書き込み cursor（次の cell の開始 offset）。4 byte 境界へ整列。
+    cursor: usize,
+}
+
+impl RegistryFixtureBuilder {
+    fn new() -> Self {
+        // bins は 0x1000 (4096) byte 確保。必要に応じて拡張する。
+        RegistryFixtureBuilder {
+            bins: vec![0u8; 0x4000],
+            cursor: 0,
+        }
+    }
+
+    /// 4 byte 境界へ整列。
+    fn align4(&mut self) {
+        while !self.cursor.is_multiple_of(4) {
+            self.cursor += 1;
+        }
+    }
+
+    /// bins の必要 size へ拡張する。
+    fn ensure(&mut self, need: usize) {
+        if self.cursor + need > self.bins.len() {
+            self.bins.resize(self.cursor + need + 0x1000, 0);
+        }
+    }
+
+    /// cell を書き込む（size field 負値 + body）。戻り値は cell の offset。
+    fn write_cell(&mut self, body: &[u8]) -> u32 {
+        self.align4();
+        let offset = self.cursor;
+        let total_size = 4 + body.len();
+        self.ensure(total_size);
+        let size_field: i32 = -((body.len() as i32) + 4);
+        self.bins[offset..offset + 4].copy_from_slice(&size_field.to_le_bytes());
+        self.bins[offset + 4..offset + 4 + body.len()].copy_from_slice(body);
+        self.cursor = offset + 4 + body.len();
+        offset as u32
+    }
+
+    /// subtree を直列化し、root の nk offset を返す。
+    fn write_subtree(&mut self, spec: &RegistryKeySpec) -> u32 {
+        // まず values を書く。
+        let mut vk_offsets: Vec<u32> = Vec::new();
+        for v in &spec.values {
+            let vk_offset = self.write_value(v);
+            vk_offsets.push(vk_offset);
+        }
+        // subkeys を先に再帰的に書く（nk offset が必要）。
+        let mut child_nk_offsets: Vec<u32> = Vec::new();
+        for child in &spec.subkeys {
+            let off = self.write_subtree(child);
+            child_nk_offsets.push(off);
+        }
+        // value list を書く（vk_offset の配列）。
+        let value_list_offset = if vk_offsets.is_empty() {
+            0xFFFF_FFFF
+        } else {
+            let mut vlist_body = Vec::with_capacity(vk_offsets.len() * 4);
+            for off in &vk_offsets {
+                vlist_body.extend_from_slice(&off.to_le_bytes());
+            }
+            self.write_cell(&vlist_body)
+        };
+        // subkey list を書く（lf 形式）。
+        let subkey_list_offset = if child_nk_offsets.is_empty() {
+            0xFFFF_FFFF
+        } else {
+            let mut lf_body = vec![0u8; 4 + child_nk_offsets.len() * 8];
+            lf_body[0..2].copy_from_slice(b"lf");
+            lf_body[2..4].copy_from_slice(&(child_nk_offsets.len() as u16).to_le_bytes());
+            for (i, off) in child_nk_offsets.iter().enumerate() {
+                lf_body[4 + i * 8..4 + i * 8 + 4].copy_from_slice(&off.to_le_bytes());
+                // hint 4 byte は 0 のまま
+            }
+            self.write_cell(&lf_body)
+        };
+
+        // 最後に root の nk を書く。
+        let name_bytes: Vec<u8> = spec
+            .name
+            .encode_utf16()
+            .flat_map(|u| u.to_le_bytes())
+            .collect();
+        let mut nk_body = vec![0u8; 70 + name_bytes.len()];
+        nk_body[0..2].copy_from_slice(b"nk");
+        nk_body[2..10].copy_from_slice(&spec.last_write_filetime.to_le_bytes());
+        nk_body[18..22].copy_from_slice(&(spec.subkeys.len() as u32).to_le_bytes());
+        nk_body[22..26].copy_from_slice(&subkey_list_offset.to_le_bytes());
+        nk_body[28..32].copy_from_slice(&(spec.values.len() as u32).to_le_bytes());
+        nk_body[32..36].copy_from_slice(&value_list_offset.to_le_bytes());
+        let name_len = name_bytes.len() as u16;
+        nk_body[68..70].copy_from_slice(&name_len.to_le_bytes());
+        nk_body[70..70 + name_bytes.len()].copy_from_slice(&name_bytes);
+        self.write_cell(&nk_body)
+    }
+
+    /// value（vk cell）を1件書く。
+    fn write_value(&mut self, spec: &RegistryValueSpec) -> u32 {
+        let name_bytes: Vec<u8> = spec
+            .name
+            .encode_utf16()
+            .flat_map(|u| u.to_le_bytes())
+            .collect();
+        // data が 4 byte 以下なら inline、それ以外は外部 data cell。
+        let (data_size_raw, data_offset_raw, data_cell_offset) = if spec.data.len() <= 4 {
+            // inline: data_size の MSB を立て、data_offset field へ data を pack。
+            let inline_size = spec.data.len() as u32;
+            let size_raw = 0x8000_0000 | inline_size;
+            let mut off_bytes = [0u8; 4];
+            off_bytes[..spec.data.len()].copy_from_slice(&spec.data);
+            (size_raw, u32::from_le_bytes(off_bytes), None)
+        } else {
+            // 外部 data cell。
+            let data_off = self.write_cell(&spec.data);
+            (spec.data.len() as u32, data_off, Some(data_off))
+        };
+
+        let mut vk_body = vec![0u8; 20 + name_bytes.len()];
+        vk_body[0..2].copy_from_slice(b"vk");
+        vk_body[2..4].copy_from_slice(&(name_bytes.len() as u16).to_le_bytes());
+        vk_body[4..8].copy_from_slice(&data_size_raw.to_le_bytes());
+        vk_body[8..12].copy_from_slice(&data_offset_raw.to_le_bytes());
+        vk_body[12..16].copy_from_slice(&spec.data_type.to_le_bytes());
+        vk_body[20..20 + name_bytes.len()].copy_from_slice(&name_bytes);
+        let vk_offset = self.write_cell(&vk_body);
+        let _ = data_cell_offset;
+        vk_offset
+    }
+
+    /// base block + bins bytes を構築する。root_offset は write_subtree が返した値。
+    fn into_bytes_with_root(self, root_offset: u32) -> Vec<u8> {
+        let bins_size = self.bins.len() as u32;
+        let mut base = vec![0u8; 4096];
+        base[0..4].copy_from_slice(&REGISTRY_REGF_MAGIC);
+        base[20..24].copy_from_slice(&1u32.to_le_bytes()); // major
+        base[24..28].copy_from_slice(&5u32.to_le_bytes()); // minor
+        base[36..40].copy_from_slice(&root_offset.to_le_bytes());
+        base[40..44].copy_from_slice(&bins_size.to_le_bytes());
+        // checksum: 先頭 508 byte を u32 で XOR。
+        let mut cksum: u32 = 0;
+        for i in 0..127 {
+            let off = i * 4;
+            let v = u32::from_le_bytes(base[off..off + 4].try_into().unwrap());
+            cksum ^= v;
+        }
+        base[508..512].copy_from_slice(&cksum.to_le_bytes());
+
+        let mut out = base;
+        out.extend_from_slice(&self.bins);
+        out
+    }
+}

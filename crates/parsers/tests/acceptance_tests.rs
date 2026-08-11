@@ -1574,3 +1574,483 @@ fn evtx_vertical_slice_evtx_to_case_jsonl() {
             == 6
     );
 }
+
+// ============================================================
+// Registry acceptance test（T4-055、互換 §12・§4.7）
+// ============================================================
+
+use tf_parsers::registry::{
+    HiveType as RegHiveType, PARSER_ID as REG_PARSER_ID, PARSER_VERSION as REG_PARSER_VERSION,
+    REGISTRY_KEY_LAST_WRITE_EVENT_TYPE as REG_KEY_LAST_WRITE_TYPE,
+    REGISTRY_OBSERVATION_EVENT_TYPE as REG_OBSERVATION_TYPE, REGISTRY_REFERENCE, RegistryParser,
+};
+
+/// Registry fixture を構築して EventStore へ流し込む共通 helper。
+fn run_registry_parser(
+    bytes: &[u8],
+    dir: &std::path::Path,
+) -> (
+    tf_parsers::ParseSummary,
+    Vec<tf_core::issue::Issue>,
+    EventStore,
+) {
+    let (evidence, _) = common::make_snapshot("SYSTEM", bytes, dir);
+    let artifact = common::make_artifact_with_source(
+        &evidence,
+        REG_PARSER_ID,
+        REG_PARSER_VERSION,
+        tf_core::event::ArtifactSource::Registry,
+    );
+    let context = ParseContext {
+        evidence: evidence.clone(),
+        artifact,
+    };
+    let spool = dir.join("reg_accept.spool");
+    let mut store = EventStore::create(&spool).unwrap();
+    let mut issues: Vec<tf_core::issue::Issue> = Vec::new();
+    let snapshot_path = std::path::Path::new(&context.evidence.snapshot_locator);
+    let mut file = std::fs::File::open(snapshot_path).unwrap();
+    let parser = RegistryParser::new();
+    {
+        let mut sink = EventStoreSink::new(&mut store, &mut issues);
+        let summary = parser.parse(&mut file, &context, &mut sink);
+        (summary, issues, store)
+    }
+}
+
+/// 標準的な Registry fixture（root + 1 subkey + 3 value）。
+fn standard_registry_fixture() -> common::RegistryKeySpec {
+    common::RegistryKeySpec {
+        name: "ROOT".to_string(),
+        last_write_filetime: common::filetime_from_unix_offset(0),
+        values: vec![
+            common::RegistryValueSpec::dword("Count", 42),
+            common::RegistryValueSpec::sz("Path", "C:\\Windows"),
+        ],
+        subkeys: vec![common::RegistryKeySpec {
+            name: "Sub".to_string(),
+            last_write_filetime: common::filetime_from_unix_offset(60),
+            values: vec![common::RegistryValueSpec::sz("User", "alice")],
+            subkeys: vec![],
+        }],
+    }
+}
+
+/// 互換 §12-1（Registry 版）: 正常 fixture から期待 Event を生成する。
+#[test]
+fn reg_acceptance_12_1_valid_fixture_emits_expected_events() {
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = common::build_registry_fixture(&standard_registry_fixture());
+    let (summary, issues, store) = run_registry_parser(&bytes, dir.path());
+
+    assert_eq!(summary.status, tf_core::case::ParseStatus::Complete);
+    // root key_last_write + 2 value + subkey key_last_write + 1 value = 5 event。
+    assert_eq!(store.len(), 5, "5 event 生成");
+    assert!(issues.is_empty(), "正常 fixture は Issue 無し: {issues:?}");
+    for result in store.iter().unwrap() {
+        let event = result.unwrap();
+        assert_eq!(event.source, tf_core::event::ArtifactSource::Registry);
+        let t = event.event_type.as_str();
+        assert!(
+            t == REG_KEY_LAST_WRITE_TYPE || t == REG_OBSERVATION_TYPE,
+            "観測型 Event のみ"
+        );
+    }
+}
+
+/// 互換 §12-2（Registry 版）: truncated・invalid length・unknown version で panic しない。
+#[test]
+fn reg_acceptance_12_2_corrupt_inputs_do_not_panic() {
+    let run = |bytes: &[u8]| {
+        let dir = tempfile::tempdir().unwrap();
+        let _ = run_registry_parser(bytes, dir.path());
+    };
+
+    // truncated: header すら無い。
+    run(&(0..10).collect::<Vec<u8>>());
+    // truncated: base block のみ。
+    run(&vec![0u8; 4096]);
+    // invalid: magic を壊す。
+    let mut bad_magic = common::build_registry_fixture(&standard_registry_fixture());
+    bad_magic[0] = 0xFF;
+    run(&bad_magic);
+    // invalid: root offset を範囲外へ。
+    let mut bad_offset = common::build_registry_fixture(&standard_registry_fixture());
+    bad_offset[36..40].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+    run(&bad_offset);
+    // unknown hive type: source_locator が未知の file 名。
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = common::build_registry_fixture(&standard_registry_fixture());
+    let (evidence, _) = common::make_snapshot("unknown.bin", &bytes, dir.path());
+    let artifact = common::make_artifact_with_source(
+        &evidence,
+        REG_PARSER_ID,
+        REG_PARSER_VERSION,
+        tf_core::event::ArtifactSource::Registry,
+    );
+    let context = ParseContext {
+        evidence: evidence.clone(),
+        artifact,
+    };
+    let spool = dir.path().join("reg_unknown.spool");
+    let mut store = EventStore::create(&spool).unwrap();
+    let mut issues: Vec<tf_core::issue::Issue> = Vec::new();
+    let snapshot_path = std::path::Path::new(&context.evidence.snapshot_locator);
+    let mut file = std::fs::File::open(snapshot_path).unwrap();
+    {
+        let mut sink = EventStoreSink::new(&mut store, &mut issues);
+        let _ = RegistryParser::new().parse(&mut file, &context, &mut sink);
+    }
+    // 全て panic せず完了（それ自体が成功）。
+}
+
+/// 互換 §12-3（Registry 版）: Provenance が元 record へ到達する。
+#[test]
+fn reg_acceptance_12_3_provenance_reaches_original_record() {
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = common::build_registry_fixture(&standard_registry_fixture());
+    let (_summary, _issues, store) = run_registry_parser(&bytes, dir.path());
+
+    for result in store.iter().unwrap() {
+        let event = result.unwrap();
+        let prov = &event.provenance;
+        assert_eq!(prov.parser_id, REG_PARSER_ID);
+        assert_eq!(prov.parser_version, REG_PARSER_VERSION);
+        assert!(matches!(
+            prov.record_locator,
+            RecordLocator::ByteRange { .. }
+        ));
+    }
+}
+
+/// 互換 §12-4（Registry 版）: 同一入力で同一 Event ID（決定性）。
+#[test]
+fn reg_acceptance_12_4_parser_is_deterministic_across_runs() {
+    let bytes = common::build_registry_fixture(&standard_registry_fixture());
+    let run_once = || -> Vec<String> {
+        let dir = tempfile::tempdir().unwrap();
+        let (_summary, _issues, store) = run_registry_parser(&bytes, dir.path());
+        let mut ids: Vec<String> = store.iter().unwrap().map(|r| r.unwrap().id).collect();
+        ids.sort();
+        ids
+    };
+    let ids1 = run_once();
+    let ids2 = run_once();
+    assert_eq!(ids1, ids2, "同一入力なら同一 Event ID（決定性）");
+}
+
+/// 互換 §12-5（Registry 版）: fixture SHA-256・生成方法を記録できる。
+#[test]
+fn reg_acceptance_12_5_fixture_metadata_recorded() {
+    let bytes = common::build_registry_fixture(&standard_registry_fixture());
+    let sha256 = common::sha256_hex(&bytes);
+    assert_eq!(sha256.len(), 64);
+    assert!(
+        sha256
+            .chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+    );
+    // 生成方法: 合成（hand-crafted, MS-RRMF / libyal libregf 準拠）。docs/learn/phase4e.md へ記録。
+}
+
+/// 互換 §12-6（Registry 版）: 外部仕様 revision / dependency version を記録する。
+#[test]
+fn reg_acceptance_12_6_reference_spec_revision_recorded() {
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = common::build_registry_fixture(&standard_registry_fixture());
+    let (_summary, _issues, store) = run_registry_parser(&bytes, dir.path());
+
+    for result in store.iter().unwrap() {
+        let event = result.unwrap();
+        assert_eq!(
+            event.attributes["registry.reference_spec"],
+            REGISTRY_REFERENCE
+        );
+        assert_eq!(
+            event.attributes["registry.parser_version"],
+            REG_PARSER_VERSION
+        );
+    }
+}
+
+/// 互換 §12-7（Registry 版）: LOG が既知だが未対応形式（HvLE）を黙って無視しない。
+#[test]
+fn reg_acceptance_12_7_unsupported_log_format_emits_issue() {
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = common::build_registry_fixture(&standard_registry_fixture());
+    // HvLE 形式の LOG。
+    let mut hvle_log = vec![0u8; 32];
+    hvle_log[0..4].copy_from_slice(&common::registry_hvle_magic());
+
+    let (evidence, _) = common::make_snapshot("SYSTEM", &bytes, dir.path());
+    let artifact = common::make_artifact_with_source(
+        &evidence,
+        REG_PARSER_ID,
+        REG_PARSER_VERSION,
+        tf_core::event::ArtifactSource::Registry,
+    );
+    let context = ParseContext {
+        evidence: evidence.clone(),
+        artifact,
+    };
+    let spool = dir.path().join("reg_hvle.spool");
+    let mut store = EventStore::create(&spool).unwrap();
+    let mut issues: Vec<tf_core::issue::Issue> = Vec::new();
+    let snapshot_path = std::path::Path::new(&context.evidence.snapshot_locator);
+    let mut file = std::fs::File::open(snapshot_path).unwrap();
+    let summary;
+    {
+        let mut sink = EventStoreSink::new(&mut store, &mut issues);
+        summary = RegistryParser::new()
+            .with_log1(hvle_log)
+            .parse(&mut file, &context, &mut sink);
+    }
+
+    // HvLE は既知だが未対応: base のみで partial。
+    assert_eq!(summary.status, tf_core::case::ParseStatus::Partial);
+    // 黙って無視せず Issue へ記録する。
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.issue_id == tf_parsers::issue::UNSUPPORTED_VERSION_CODE),
+        "UNSUPPORTED_VERSION が記録される: {issues:?}"
+    );
+    // LOG の SHA-256 も記録される。
+    assert!(
+        issues.iter().any(|i| i.message.contains("log1_sha256=")),
+        "LOG hash が記録される: {issues:?}"
+    );
+}
+
+/// 互換 §12-8（Registry 版）: 形式の意味を越えて Event type を断定しない。
+#[test]
+fn reg_acceptance_12_8_event_type_does_not_overstate_observation() {
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = common::build_registry_fixture(&standard_registry_fixture());
+    let (_summary, _issues, store) = run_registry_parser(&bytes, dir.path());
+
+    for result in store.iter().unwrap() {
+        let event = result.unwrap();
+        // assertion は Observed（規範 §7.1）。
+        assert_eq!(event.assertion, tf_core::event::AssertionKind::Observed);
+        let et = event.event_type.as_str();
+        // registry_set / registry_delete は断定型 → 生成しない。
+        assert_ne!(et, "registry_set");
+        assert_ne!(et, "registry_delete");
+        assert!(!et.contains("created"));
+        assert!(!et.contains("deleted"));
+        assert!(!et.contains("modified"));
+        assert!(!et.contains("set"));
+    }
+}
+
+/// dual view: 合成 LOG replay で recovered view も生成される。
+#[test]
+fn reg_acceptance_dual_view_base_and_recovered() {
+    let dir = tempfile::tempdir().unwrap();
+    let (bytes, root_offset) =
+        common::build_registry_fixture_with_root_offset(&standard_registry_fixture());
+    let root_ft_offset = (4096 + root_offset as usize + 4 + 2) as u32;
+    let new_ft_bytes = common::filetime_from_unix_offset(600).to_le_bytes();
+    let log_entry = common::registry_log_entry(root_ft_offset, new_ft_bytes.to_vec());
+    let log_bytes = common::build_registry_log_fixture(&[log_entry]);
+
+    let (evidence, _) = common::make_snapshot("SYSTEM", &bytes, dir.path());
+    let artifact = common::make_artifact_with_source(
+        &evidence,
+        REG_PARSER_ID,
+        REG_PARSER_VERSION,
+        tf_core::event::ArtifactSource::Registry,
+    );
+    let context = ParseContext {
+        evidence: evidence.clone(),
+        artifact,
+    };
+    let spool = dir.path().join("reg_dual.spool");
+    let mut store = EventStore::create(&spool).unwrap();
+    let mut issues: Vec<tf_core::issue::Issue> = Vec::new();
+    let snapshot_path = std::path::Path::new(&context.evidence.snapshot_locator);
+    let mut file = std::fs::File::open(snapshot_path).unwrap();
+    let summary;
+    {
+        let mut sink = EventStoreSink::new(&mut store, &mut issues);
+        summary = RegistryParser::new()
+            .with_log1(log_bytes)
+            .parse(&mut file, &context, &mut sink);
+    }
+    assert_eq!(summary.status, tf_core::case::ParseStatus::Complete);
+
+    let mut base = 0;
+    let mut recovered = 0;
+    for result in store.iter().unwrap() {
+        let event = result.unwrap();
+        match event.attributes["registry.view"].as_str().unwrap() {
+            "base" => base += 1,
+            "recovered" => recovered += 1,
+            _ => {}
+        }
+    }
+    assert_eq!(base, 5, "base view は5 event");
+    assert_eq!(recovered, 5, "recovered view は5 event");
+    // LOG hash が各 Event 属性へ記録される（互換 §4.7: 使用 log hash を記録）。
+    // 成功時は Issue を出さず、属性へ完全 64 桁 hex を保存する設計。
+    let mut all_success = true;
+    let mut has_log1_hash = false;
+    for result in store.iter().unwrap() {
+        let event = result.unwrap();
+        if event.attributes["registry.replay_status"] != "success" {
+            all_success = false;
+        }
+        if let Some(v) = event
+            .attributes
+            .get("registry.log1_sha256")
+            .and_then(|v| v.as_str())
+            && v.len() == 64
+        {
+            has_log1_hash = true;
+        }
+    }
+    assert!(all_success, "replay_status=success が全 Event へ記録される");
+    assert!(has_log1_hash, "log1_sha256 (64 桁) が記録される");
+}
+
+/// Amcache.hve は Registry Parser と明示的併用可能（自動 fallback 禁止）。
+#[test]
+fn reg_acceptance_amcache_hive_parses_as_registry() {
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = common::build_registry_fixture(&standard_registry_fixture());
+    // source_locator を Amcache.hve にする。hive_type = amcache となる。
+    let (evidence, _) = common::make_snapshot("Amcache.hve", &bytes, dir.path());
+    let artifact = common::make_artifact_with_source(
+        &evidence,
+        REG_PARSER_ID,
+        REG_PARSER_VERSION,
+        tf_core::event::ArtifactSource::Registry,
+    );
+    let context = ParseContext {
+        evidence: evidence.clone(),
+        artifact,
+    };
+    let spool = dir.path().join("reg_amcache.spool");
+    let mut store = EventStore::create(&spool).unwrap();
+    let mut issues: Vec<tf_core::issue::Issue> = Vec::new();
+    let snapshot_path = std::path::Path::new(&context.evidence.snapshot_locator);
+    let mut file = std::fs::File::open(snapshot_path).unwrap();
+    let summary;
+    {
+        let mut sink = EventStoreSink::new(&mut store, &mut issues);
+        summary = RegistryParser::new().parse(&mut file, &context, &mut sink);
+    }
+    assert_eq!(summary.status, tf_core::case::ParseStatus::Complete);
+    assert!(!store.is_empty());
+    // hive_type = amcache（Amcache Parser と明示的併用を許可）。
+    let first = store.iter().unwrap().next().unwrap().unwrap();
+    assert_eq!(
+        first.attributes["registry.hive_type"],
+        RegHiveType::Amcache.as_str()
+    );
+}
+
+/// Registry の縦割り: Registry のみで analyze → Case JSONL + Manifest が生成される。
+#[test]
+fn reg_vertical_slice_registry_to_case_jsonl() {
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = common::build_registry_fixture(&standard_registry_fixture());
+    let (evidence, _) = common::make_snapshot("SYSTEM", &bytes, dir.path());
+    let artifact = common::make_artifact_with_source(
+        &evidence,
+        REG_PARSER_ID,
+        REG_PARSER_VERSION,
+        tf_core::event::ArtifactSource::Registry,
+    );
+
+    let spool_path = dir.path().join("case.spool");
+    let mut store = EventStore::create(&spool_path).unwrap();
+    let mut issues: Vec<tf_core::issue::Issue> = Vec::new();
+    let context = ParseContext {
+        evidence: evidence.clone(),
+        artifact: artifact.clone(),
+    };
+    let snapshot_path = std::path::Path::new(&context.evidence.snapshot_locator);
+    let mut file = std::fs::File::open(snapshot_path).unwrap();
+    {
+        let mut sink = EventStoreSink::new(&mut store, &mut issues);
+        RegistryParser::new().parse(&mut file, &context, &mut sink);
+    }
+    store.commit().unwrap();
+    assert_eq!(store.len(), 5);
+
+    let case_id = tf_core::id::case_id(&[evidence.evidence_id.as_str()]);
+    let case = CaseMetadata {
+        case_id: case_id.clone(),
+        external_case_id: None,
+        name: "Registry vertical slice".to_string(),
+        analyst: None,
+        description: None,
+        default_timezone: None,
+        tags: vec![],
+    };
+    let other_counts = OtherCounts {
+        evidence: 1,
+        artifact: 1,
+        issue: 0,
+        match_: 0,
+        finding: 0,
+    };
+    let manifest_counts = build_manifest_counts(&store, &other_counts);
+    let manifest = Manifest {
+        traceforge_version: "0.1.0".to_string(),
+        build_commit: "test".to_string(),
+        target: "test".to_string(),
+        schema_version: SCHEMA_VERSION.to_string(),
+        compatibility_profile: "TF-WIN-1.0".to_string(),
+        run_started_at: "2026-08-11T01:00:00Z".to_string(),
+        run_finished_at: "2026-08-11T01:00:01Z".to_string(),
+        resolved_config: serde_json::json!({}),
+        resolved_config_sha256: "e".repeat(64),
+        case_id: case_id.clone(),
+        counts: manifest_counts,
+        components: vec![serde_json::json!({
+            "parser_id": REG_PARSER_ID,
+            "parser_version": REG_PARSER_VERSION,
+            "reference": REGISTRY_REFERENCE,
+        })],
+        rules: vec![],
+        attack_dataset: None,
+        timezone_assumptions: vec![],
+        limits: serde_json::json!({}),
+        incomplete_reasons: vec![],
+        complete: true,
+        exit_code: 0,
+    };
+    let stream = CaseStream {
+        case: &case,
+        evidence: std::slice::from_ref(&evidence),
+        artifacts: std::slice::from_ref(&artifact),
+        issues: &issues,
+        matches: &[],
+        findings: &[],
+        manifest: &manifest,
+    };
+
+    let mut output: Vec<u8> = Vec::new();
+    let outcome = write_jsonl(&store, &stream, 1024 * 1024, None, &mut output).unwrap();
+    assert_eq!(outcome.events_output, 5);
+
+    let output_str = String::from_utf8(output).unwrap();
+    let record_types: Vec<String> = output_str
+        .lines()
+        .map(|l| {
+            let v: Value = serde_json::from_str(l).unwrap();
+            v["record_type"].as_str().unwrap().to_string()
+        })
+        .collect();
+    assert_eq!(record_types.last(), Some(&"manifest".to_string()));
+    assert!(
+        record_types
+            .iter()
+            .filter(|t| t == &&"event".to_string())
+            .count()
+            == 5
+    );
+}
