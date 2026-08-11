@@ -527,3 +527,138 @@ impl XpressBitWriter {
         self.out
     }
 }
+
+// ============================================================
+// USN Journal fixture（合成・Microsoft USN_RECORD 準拠）
+// ============================================================
+
+/// USN_RECORD_V2 固定部（filename 領域を含まない）。
+pub const USN_V2_FIXED_BYTES: usize = 60;
+/// USN_RECORD_V3 固定部（filename 領域を含まない）。
+pub const USN_V3_FIXED_BYTES: usize = 76;
+/// USN_RECORD_V4 固定部（filename 無し）。
+pub const USN_V4_FIXED_BYTES: usize = 84;
+
+/// 合成 USN_RECORD_V2 を1件構築する（hand-crafted・Microsoft 仕様準拠）。
+///
+/// `name` は UTF-16LE + null 終端で格納される。record_length は固定部 + name を自動計算。
+#[allow(clippy::too_many_arguments)]
+pub fn build_usn_v2_record(
+    file_ref: u64,
+    parent_ref: u64,
+    usn: i64,
+    time_filetime: u64,
+    reason: u32,
+    source_info: u32,
+    security_id: u32,
+    file_attributes: u32,
+    name: &str,
+) -> Vec<u8> {
+    let name_units: Vec<u16> = name.encode_utf16().collect();
+    let name_bytes: Vec<u8> = name_units.iter().flat_map(|u| u.to_le_bytes()).collect();
+    let name_len_with_null = (name_bytes.len() + 2) as u16;
+    let total = USN_V2_FIXED_BYTES + name_bytes.len() + 2;
+    let mut buf = vec![0u8; total];
+    buf[0..4].copy_from_slice(&(total as u32).to_le_bytes());
+    buf[4..6].copy_from_slice(&2u16.to_le_bytes());
+    buf[6..8].copy_from_slice(&0u16.to_le_bytes());
+    buf[8..16].copy_from_slice(&file_ref.to_le_bytes());
+    buf[16..24].copy_from_slice(&parent_ref.to_le_bytes());
+    buf[24..32].copy_from_slice(&usn.to_le_bytes());
+    buf[32..40].copy_from_slice(&time_filetime.to_le_bytes());
+    buf[40..44].copy_from_slice(&reason.to_le_bytes());
+    buf[44..48].copy_from_slice(&source_info.to_le_bytes());
+    buf[48..52].copy_from_slice(&security_id.to_le_bytes());
+    buf[52..56].copy_from_slice(&file_attributes.to_le_bytes());
+    buf[56..58].copy_from_slice(&name_len_with_null.to_le_bytes());
+    buf[58..60].copy_from_slice(&(USN_V2_FIXED_BYTES as u16).to_le_bytes());
+    buf[USN_V2_FIXED_BYTES..USN_V2_FIXED_BYTES + name_bytes.len()].copy_from_slice(&name_bytes);
+    buf
+}
+
+/// 合成 USN_RECORD_V3 を1件構築する。128-bit file reference を切り詰めず保持。
+#[allow(clippy::too_many_arguments)]
+pub fn build_usn_v3_record(
+    file_ref: [u8; 16],
+    parent_ref: [u8; 16],
+    usn: i64,
+    time_filetime: u64,
+    reason: u32,
+    source_info: u32,
+    security_id: u32,
+    file_attributes: u32,
+    name: &str,
+) -> Vec<u8> {
+    let name_units: Vec<u16> = name.encode_utf16().collect();
+    let name_bytes: Vec<u8> = name_units.iter().flat_map(|u| u.to_le_bytes()).collect();
+    let name_len_with_null = (name_bytes.len() + 2) as u16;
+    let total = USN_V3_FIXED_BYTES + name_bytes.len() + 2;
+    let mut buf = vec![0u8; total];
+    buf[0..4].copy_from_slice(&(total as u32).to_le_bytes());
+    buf[4..6].copy_from_slice(&3u16.to_le_bytes());
+    buf[6..8].copy_from_slice(&0u16.to_le_bytes());
+    buf[8..24].copy_from_slice(&file_ref);
+    buf[24..40].copy_from_slice(&parent_ref);
+    buf[40..48].copy_from_slice(&usn.to_le_bytes());
+    buf[48..56].copy_from_slice(&time_filetime.to_le_bytes());
+    buf[56..60].copy_from_slice(&reason.to_le_bytes());
+    buf[60..64].copy_from_slice(&source_info.to_le_bytes());
+    buf[64..68].copy_from_slice(&security_id.to_le_bytes());
+    buf[68..72].copy_from_slice(&file_attributes.to_le_bytes());
+    buf[72..74].copy_from_slice(&name_len_with_null.to_le_bytes());
+    buf[74..76].copy_from_slice(&(USN_V3_FIXED_BYTES as u16).to_le_bytes());
+    buf[USN_V3_FIXED_BYTES..USN_V3_FIXED_BYTES + name_bytes.len()].copy_from_slice(&name_bytes);
+    buf
+}
+
+/// 合成 USN_RECORD_V4 を1件構築する（filename 無し、range tracking 保持）。
+#[allow(clippy::too_many_arguments)]
+pub fn build_usn_v4_record(
+    file_ref: [u8; 16],
+    parent_ref: [u8; 16],
+    usn: i64,
+    time_filetime: u64,
+    reason: u32,
+    source_info: u32,
+    remaining_extents: u16,
+    number_of_extents: u16,
+    extent_location: u64,
+    extent_length: u64,
+) -> Vec<u8> {
+    let total = USN_V4_FIXED_BYTES;
+    let mut buf = vec![0u8; total];
+    buf[0..4].copy_from_slice(&(total as u32).to_le_bytes());
+    buf[4..6].copy_from_slice(&4u16.to_le_bytes());
+    buf[6..8].copy_from_slice(&0u16.to_le_bytes());
+    buf[8..24].copy_from_slice(&file_ref);
+    buf[24..40].copy_from_slice(&parent_ref);
+    buf[40..48].copy_from_slice(&usn.to_le_bytes());
+    buf[48..56].copy_from_slice(&time_filetime.to_le_bytes());
+    buf[56..60].copy_from_slice(&reason.to_le_bytes());
+    buf[60..64].copy_from_slice(&source_info.to_le_bytes());
+    buf[64..66].copy_from_slice(&remaining_extents.to_le_bytes());
+    buf[66..68].copy_from_slice(&number_of_extents.to_le_bytes());
+    buf[68..76].copy_from_slice(&extent_location.to_le_bytes());
+    buf[76..84].copy_from_slice(&extent_length.to_le_bytes());
+    buf
+}
+
+/// USN reason bit field（`USN_RECORD_*::Reason`）の test 用定数。
+pub mod usn_reason {
+    pub const DATA_OVERWRITE: u32 = 0x0000_0001;
+    pub const DATA_EXTEND: u32 = 0x0000_0002;
+    pub const DATA_TRUNCATION: u32 = 0x0000_0004;
+    pub const FILE_CREATE: u32 = 0x0000_0100;
+    pub const FILE_DELETE: u32 = 0x0000_0200;
+    pub const SECURITY_CHANGE: u32 = 0x0000_0800;
+    pub const RENAME_OLD_NAME: u32 = 0x0000_1000;
+    pub const RENAME_NEW_NAME: u32 = 0x0000_2000;
+    pub const BASIC_INFO_CHANGE: u32 = 0x0000_8000;
+    pub const CLOSE: u32 = 0x8000_0000;
+}
+
+/// 与えた filetime が「2026-08-10T01:15:20Z + offset_seconds」へ相当するものを返す。
+/// （`filetime_from_unix_offset` と同一。USN test 用の別名。）
+pub fn usn_filetime_from_unix_offset(offset_seconds: i64) -> u64 {
+    filetime_from_unix_offset(offset_seconds)
+}

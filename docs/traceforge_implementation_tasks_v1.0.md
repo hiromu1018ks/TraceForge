@@ -224,14 +224,14 @@
 
 ### 7.4 USN Journal Parser
 
-- [ ] T4-030 `USN_RECORD_COMMON_HEADER` MajorVersion 検出（互換 §4.3）
-- [ ] T4-031 USN_RECORD_V2 解析（互換 §4.3）
-- [ ] T4-032 USN_RECORD_V3 解析（128-bit reference 切詰め禁止、互換 §4.3）
-- [ ] T4-033 USN_RECORD_V4 解析（range tracking、filename 非前提、互換 §4.3）
-- [ ] T4-034 rename OLD_NAME/NEW_NAME 結合（同一 reference + 近接 USN + 対応 reason、互換 §4.3）
-- [ ] T4-035 path reconstruction（同一 Evidence set 内のみ、host 検索禁止、互換 §4.3）
-- [ ] T4-036 未知 MajorVersion の安全 skip + Warning（互換 §4.3）
-- [ ] T4-037 USN fixture + acceptance test（互換 §12）
+- [x] T4-030 `USN_RECORD_COMMON_HEADER` MajorVersion 検出（互換 §4.3）
+- [x] T4-031 USN_RECORD_V2 解析（互換 §4.3）
+- [x] T4-032 USN_RECORD_V3 解析（128-bit reference 切詰め禁止、互換 §4.3）
+- [x] T4-033 USN_RECORD_V4 解析（range tracking、filename 非前提、互換 §4.3）
+- [x] T4-034 rename OLD_NAME/NEW_NAME 結合（同一 reference + 近接 USN + 対応 reason、互換 §4.3）
+- [x] T4-035 path reconstruction（同一 Evidence set 内のみ、host 検索禁止、互換 §4.3）
+- [x] T4-036 未知 MajorVersion の安全 skip + Warning（互換 §4.3）
+- [x] T4-037 USN fixture + acceptance test（互換 §12）
 
 ### 7.5 EVTX Parser
 

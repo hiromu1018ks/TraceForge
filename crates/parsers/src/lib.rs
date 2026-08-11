@@ -4,7 +4,8 @@
 //! - Parser framework（[`framework`]・[`issue`]・[`sink`]、規範 §9）
 //! - LNK（[`lnk`]、[MS-SHLLINK]、互換 §4.4）— M2 縦割りスライス対象
 //! - Prefetch（[`prefetch`]、libyal PF format、互換 §4.1）— MAM 圧縮展開付き
-//! - 残り5種（USN / EVTX / Registry / Amcache / Jump Lists）は順次追加
+//! - USN Journal（[`usn`]、Microsoft USN_RECORD_V2/V3/V4、互換 §4.3）— record-stream 型
+//! - 残り4種（EVTX / Registry / Amcache / Jump Lists）は順次追加
 //!
 //! ## 設計の要点
 //!
@@ -23,6 +24,7 @@ pub mod issue;
 pub mod lnk;
 pub mod prefetch;
 pub mod sink;
+pub mod usn;
 
 // よく使う主要型をルートへ再公開。
 pub use framework::{
@@ -32,4 +34,8 @@ pub use framework::{
 pub use lnk::{LnkParser, PARSER_ID as LNK_PARSER_ID, PARSER_VERSION as LNK_PARSER_VERSION};
 pub use prefetch::{
     PARSER_ID as PREFETCH_PARSER_ID, PARSER_VERSION as PREFETCH_PARSER_VERSION, PrefetchParser,
+};
+pub use usn::{
+    PARSER_ID as USN_PARSER_ID, PARSER_VERSION as USN_PARSER_VERSION,
+    USN_CHANGE_OBSERVED_EVENT_TYPE, USN_REFERENCE, UsnParser,
 };

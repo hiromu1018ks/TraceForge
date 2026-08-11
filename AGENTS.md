@@ -80,7 +80,7 @@ fuzz target の link は Windows MSVC 環境で失敗する（libfuzzer-sys の�
 - `tf-core` の統合テストは `crates/core/tests/` 配下（`schema_fixtures.rs`・`property_tests.rs`）。Schema §9 fixture は `crates/core/tests/fixtures/schema/` へ保存する。
 - `tf-evidence` の統合テストは `crates/evidence/tests/` 配下（`acceptance_tests.rs`）。規範 §21 の受け入れ条件（§21-3・§21-4・§21-9・§21-10）を検証する。
 - `tf-store` の統合テストは `crates/store/tests/` 配下（`acceptance_tests.rs`）。規範 §21 の受け入れ条件（§21-2・§21-6・§21-8）を検証する。
-- `tf-parsers` の統合テストは `crates/parsers/tests/` 配下（`framework_tests.rs`・`lnk_tests.rs`・`prefetch_tests.rs`・`acceptance_tests.rs`）。規範 §9（Parser 契約）・互換 §4.1（Prefetch）・互換 §4.4（LNK）・互換 §12（acceptance 8条件）・M2 縦割りを検証する。共通ヘルパー（合成 LNK/LNK fixture 生成・合成 Prefetch fixture 生成・literal-only MAM 圧縮・snapshot・ArtifactInstance 構築）は `tests/common/mod.rs`。
+- `tf-parsers` の統合テストは `crates/parsers/tests/` 配下（`framework_tests.rs`・`lnk_tests.rs`・`prefetch_tests.rs`・`usn_tests.rs`・`acceptance_tests.rs`）。規範 §9（Parser 契約）・互換 §4.1（Prefetch）・互換 §4.3（USN）・互換 §4.4（LNK）・互換 §12（acceptance 8条件）・M2 縦割りを検証する。共通ヘルパー（合成 LNK/LNK fixture 生成・合成 Prefetch fixture 生成・合成 USN V2/V3/V4 fixture 生成・literal-only MAM 圧縮・snapshot・ArtifactInstance 構築）は `tests/common/mod.rs`。
 - `tf-core` の `time.rs` へ Phase 3 で `TimePrecision` / `TimezoneSource` / `TimestampKind` の `from_schema_str` メソッドを追加した（Event 復元に必要な lowercase 文字列からの変換）。
 - `tf-parsers` の依存方向: `tf-parsers` → `tf-core`/`tf-evidence`/`tf-store`（本番依存）。`tf-store` は `tf-parsers` へ依存しない（EventStoreSink を tf-parsers 側へ置くことで循環を回避）。M2 縦割りは tf-parsers の統合テストで実施する。
 
