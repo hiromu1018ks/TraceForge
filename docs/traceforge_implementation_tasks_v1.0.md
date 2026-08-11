@@ -165,29 +165,29 @@
 
 ### 6.1 Event Store
 
-- [ ] T3-001 length-delimited spool file Event Store 実装（規範 §10）
-- [ ] T3-002 書き込み時 Schema validation（規範 §10）
-- [ ] T3-003 Event ID 一意制約（規範 §10）
-- [ ] T3-004 commit marker（未完了 Case 判別、規範 §10）
-- [ ] T3-005 最終出力完了まで自動削除しない（規範 §10）
-- [ ] T3-006 permission を所有者限定（規範 §10）
-- [ ] T3-007 決定的 iteration（timestamp group + Event ID、規範 §10）
-- [ ] T3-008 external merge sort（memory budget 超過時、規範 §10）
-- [ ] T3-009 100万 Event で全件 `Vec` 不使用 test（規範 §21-6）
+- [x] T3-001 length-delimited spool file Event Store 実装（規範 §10）
+- [x] T3-002 書き込み時 Schema validation（規範 §10）
+- [x] T3-003 Event ID 一意制約（規範 §10）
+- [x] T3-004 commit marker（未完了 Case 判別、規範 §10）
+- [x] T3-005 最終出力完了まで自動削除しない（規範 §10）
+- [x] T3-006 permission を所有者限定（規範 §10）
+- [x] T3-007 決定的 iteration（timestamp group + Event ID、規範 §10）
+- [x] T3-008 external merge sort（memory budget 超過時、規範 §10）
+- [x] T3-009 100万 Event で全件 `Vec` 不使用 test（規範 §21-6）
 
 ### 6.2 Timeline
 
-- [ ] T3-020 5 group 順序実装（規範 §6.3）
-- [ ] T3-021 group 内 sort（UTC 昇順 + Event ID、Range 欠損末尾、規範 §6.3）
-- [ ] T3-022 group をまたぐ因果順序の断定禁止（規範 §6.3）
-- [ ] T3-023 同一 timestamp の Event ID 安定順 test（規範 §21-8）
-- [ ] T3-024 不明時刻 Event の Timeline 末尾 group 出力 test（規範 §21-2）
-- [ ] T3-025 Timeline filter / summary（F-009、F-030）
+- [x] T3-020 5 group 順序実装（規範 §6.3）
+- [x] T3-021 group 内 sort（UTC 昇順 + Event ID、Range 欠損末尾、規範 §6.3）
+- [x] T3-022 group をまたぐ因果順序の断定禁止（規範 §6.3）
+- [x] T3-023 同一 timestamp の Event ID 安定順 test（規範 §21-8）
+- [x] T3-024 不明時刻 Event の Timeline 末尾 group 出力 test（規範 §21-2）
+- [x] T3-025 Timeline filter / summary（F-009、F-030）
 
 ### 6.3 最小出力（縦割り用）
 
-- [ ] T3-030 最小 JSON Case 出力（M2 用、正式版は Phase 7 へ引き継ぐ）
-- [ ] T3-031 最小 Manifest 出力（run metadata 分離、規範 §13.1）
+- [x] T3-030 最小 JSON Case 出力（M2 用、正式版は Phase 7 へ引き継ぐ）
+- [x] T3-031 最小 Manifest 出力（run metadata 分離、規範 §13.1）
 
 ---
 

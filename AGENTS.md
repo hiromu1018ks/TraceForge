@@ -67,15 +67,18 @@ mise でローカル環境を管理する場合は `.mise.toml` でバージョ�
 CI（`.github/workflows/ci.yml`）は push / pull_request で上記を自動実行する。
 fuzz target の link は Windows MSVC 環境で失敗する（libfuzzer-sys のエントリポイント制約）ため、Linux CI で担保する。
 
-### 依存構成（Phase 2 更新）
+### 依存構成（Phase 3 更新）
 
 - workspace 共通依存はルート `Cargo.toml` の `[workspace.dependencies]` へ一元管理し、各 crate は `<dep>.workspace = true` で継承する。version は `Cargo.lock` へ pin され、cargo-deny で再現性と供給連鎖安全を担保する。
 - `tf-core` が Phase 1 で追加した依存: `sha2`（SHA-256）、`hex`（lowercase hex）、`serde` / `serde_json`（canonical JSON・Case JSON）、`jsonschema`（Draft 2020-12、default-features を切って `draft202012` のみ有効化・外部通信なし）、`chrono` / `chrono-tz`（EventTime・IANA timezone・DST）、`toml`（設定 load）、`thiserror`（Error 型 derive）。
 - `tf-evidence` が Phase 2 で追加した依存: `tf-core`（path + version 指定で cargo-deny wildcard 対応）、`sha2`・`hex`（snapshot 中の同時 SHA-256、規範 §5.5）、`unicode-normalization`（source_locator の NFC 正規化、規範 §5.2）、`thiserror`（Error 型 derive）。dev-dependency に `tempfile`（テスト用一時 directory）。
+- `tf-store` が Phase 3 で追加した依存: `tf-core`（path + version 指定）、`serde_json`（Event の canonical JSON 直列化・復元、規範 §10）、`chrono`（EventTime 復元時の DateTime parse、規範 §6）、`thiserror`（Error 型 derive）。dev-dependency に `tempfile`（テスト用一時 directory）。
 - workspace `[workspace.dependencies]` へ `unicode-normalization = "0.1"` を追加した。
-- dev-dependencies: `proptest`（property test、`tests/property_tests.rs`）と `criterion`（benchmark）は `tf-core`。`tempfile` は `tf-evidence`。
+- dev-dependencies: `proptest`（property test、`tests/property_tests.rs`）と `criterion`（benchmark）は `tf-core`。`tempfile` は `tf-evidence` と `tf-store`。
 - `deny.toml` の許可ライセンスへ `MIT-0`（MIT No Attribution）を追加した。`jsonschema` の依存 `borrow-or-share` が同ライセンスのため。
 - `tf-core` の統合テストは `crates/core/tests/` 配下（`schema_fixtures.rs`・`property_tests.rs`）。Schema §9 fixture は `crates/core/tests/fixtures/schema/` へ保存する。
 - `tf-evidence` の統合テストは `crates/evidence/tests/` 配下（`acceptance_tests.rs`）。規範 §21 の受け入れ条件（§21-3・§21-4・§21-9・§21-10）を検証する。
+- `tf-store` の統合テストは `crates/store/tests/` 配下（`acceptance_tests.rs`）。規範 §21 の受け入れ条件（§21-2・§21-6・§21-8）を検証する。
+- `tf-core` の `time.rs` へ Phase 3 で `TimePrecision` / `TimezoneSource` / `TimestampKind` の `from_schema_str` メソッドを追加した（Event 復元に必要な lowercase 文字列からの変換）。
 
 **ビルド・test・lint 等のコマンドや構成を新規導入・変更したら、その時点で本ファイルへ追記・更新すること。**

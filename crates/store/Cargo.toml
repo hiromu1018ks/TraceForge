@@ -9,3 +9,17 @@ publish.workspace = true
 
 [lints]
 workspace = true
+
+[dependencies]
+# Phase 1 のコアデータモデル（Event・EventTime・Schema validator・canonical JSON 等）を再利用
+tf-core = { path = "../core", version = "0.1.0" }
+# Event の canonical JSON 直列化・復元（規範 §10）
+serde_json.workspace = true
+# EventTime 復元時の DateTime<Utc> / NaiveDateTime parse（規範 §6）
+chrono.workspace = true
+# Error 型 derive（規範 §17）
+thiserror.workspace = true
+
+[dev-dependencies]
+# テスト用一時 directory（EventStore の spool file 等）
+tempfile = "3"

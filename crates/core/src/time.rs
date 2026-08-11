@@ -71,6 +71,20 @@ impl TimePrecision {
             TimePrecision::Unknown => "unknown",
         }
     }
+
+    /// Schema §4 の lowercase 文字列から復元する。未知値は `None`。
+    pub fn from_schema_str(s: &str) -> Option<Self> {
+        Some(match s {
+            "nanosecond" => TimePrecision::Nanosecond,
+            "microsecond" => TimePrecision::Microsecond,
+            "millisecond" => TimePrecision::Millisecond,
+            "second" => TimePrecision::Second,
+            "minute" => TimePrecision::Minute,
+            "day" => TimePrecision::Day,
+            "unknown" => TimePrecision::Unknown,
+            _ => return None,
+        })
+    }
 }
 
 /// timezone の根拠（規範 §6.1、Schema §4 の `timezone_source` enum）。
@@ -102,6 +116,19 @@ impl TimezoneSource {
             TimezoneSource::Unknown => "unknown",
         }
     }
+
+    /// Schema §4 の lowercase 文字列から復元する。未知値は `None`。
+    pub fn from_schema_str(s: &str) -> Option<Self> {
+        Some(match s {
+            "artifact_defined" => TimezoneSource::ArtifactDefined,
+            "explicit_offset" => TimezoneSource::ExplicitOffset,
+            "case_default" => TimezoneSource::CaseDefault,
+            "cli_override" => TimezoneSource::CliOverride,
+            "inferred" => TimezoneSource::Inferred,
+            "unknown" => TimezoneSource::Unknown,
+            _ => return None,
+        })
+    }
 }
 
 /// timestamp の意味（Schema §4 の `kind` enum）。
@@ -130,6 +157,21 @@ impl TimestampKind {
             TimestampKind::Observed => "observed",
             TimestampKind::Unknown => "unknown",
         }
+    }
+
+    /// Schema §4 の lowercase 文字列から復元する。未知値は `None`。
+    pub fn from_schema_str(s: &str) -> Option<Self> {
+        Some(match s {
+            "created" => TimestampKind::Created,
+            "modified" => TimestampKind::Modified,
+            "accessed" => TimestampKind::Accessed,
+            "executed" => TimestampKind::Executed,
+            "event_logged" => TimestampKind::EventLogged,
+            "registry_modified" => TimestampKind::RegistryModified,
+            "observed" => TimestampKind::Observed,
+            "unknown" => TimestampKind::Unknown,
+            _ => return None,
+        })
     }
 }
 
