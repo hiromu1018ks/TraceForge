@@ -1132,3 +1132,340 @@ impl RegistryFixtureBuilder {
         out
     }
 }
+
+// ============================================================
+// Jump Lists fixture（合成・[MS-CFB] + [MS-DESTS] + [MS-SHLLINK] 準拠）
+// ============================================================
+
+/// 合成 LNK bytes を構築する（Jump Lists 内包 LNK 用・LNK header + TerminalBlock の最小構成）。
+///
+/// 既存の [`build_lnk_fixture`] との違いは、file_size 引数・target base path を明示指定
+/// できる点と、`with_extra_data = true`（TerminalBlock 付き）を既定とする点。
+pub fn build_jump_list_lnk(
+    creation_ft: u64,
+    access_ft: u64,
+    write_ft: u64,
+    file_size: u32,
+    target_base_path: Option<&str>,
+    is_unicode: bool,
+) -> Vec<u8> {
+    // flags: HasLinkInfo + IsUnicode（unicode 指定時）。target 無しの場合は HasLinkInfo 無し。
+    let has_link_info = target_base_path.is_some();
+    let flags: u32 =
+        (if has_link_info { 0x0000_0002 } else { 0 }) | (if is_unicode { 0x0000_0080 } else { 0 });
+
+    let opts = LnkFixtureOptions {
+        flags,
+        creation_filetime: creation_ft,
+        access_filetime: access_ft,
+        write_filetime: write_ft,
+        file_size,
+        with_name_string: false,
+        local_base_path: target_base_path.map(|s| s.to_string()),
+        with_extra_data: true,
+    };
+    build_lnk_fixture(&opts)
+}
+
+/// 合成 v1 (Win7 SP1) DestList bytes を構築する（[MS-DESTS]・hand-crafted）。
+pub fn build_destlist_v1(entries: &[(u64, &str)]) -> Vec<u8> {
+    let mut buf = Vec::new();
+    // header (32 byte)
+    buf.extend_from_slice(&1u32.to_le_bytes()); // version
+    buf.extend_from_slice(&28u32.to_le_bytes()); // following size
+    buf.extend_from_slice(&(entries.len() as u32).to_le_bytes()); // entry count
+    buf.extend_from_slice(&1u32.to_le_bytes()); // unknown
+    buf.extend_from_slice(&0u64.to_le_bytes()); // last revision (FILETIME)
+    buf.extend_from_slice(&0u64.to_le_bytes()); // unknown
+    assert_eq!(buf.len(), 32);
+    // entries
+    for &(last_used_ft, stream_name) in entries {
+        let name_units: Vec<u16> = stream_name.encode_utf16().collect();
+        let name_bytes: Vec<u8> = name_units.iter().flat_map(|u| u.to_le_bytes()).collect();
+        let mut entry = vec![0u8; 74];
+        entry[0..8].copy_from_slice(&last_used_ft.to_le_bytes()); // last_used
+        entry[40..48].copy_from_slice(&(last_used_ft + 1).to_le_bytes()); // created
+        entry[48..56].copy_from_slice(&(last_used_ft + 2).to_le_bytes()); // modified
+        // v1: name length in UTF-16 code units (with null)
+        let name_units_with_null = (name_units.len() + 1) as u16;
+        entry[28..30].copy_from_slice(&name_units_with_null.to_le_bytes());
+        buf.extend_from_slice(&entry);
+        buf.extend_from_slice(&name_bytes);
+        buf.extend_from_slice(&0u16.to_le_bytes()); // null 終端
+        buf.extend_from_slice(&0u32.to_le_bytes()); // trailing unknown
+    }
+    buf
+}
+
+/// 合成 v3 (Win10 22H2) DestList bytes を構築する。
+pub fn build_destlist_v3(entries: &[(u64, &str)]) -> Vec<u8> {
+    build_destlist_v3_like(3, entries)
+}
+
+/// 合成 v4 (Win11 24H2) DestList bytes を構築する。v3 と同一構造・version 値のみ相違。
+pub fn build_destlist_v4(entries: &[(u64, &str)]) -> Vec<u8> {
+    build_destlist_v3_like(4, entries)
+}
+
+fn build_destlist_v3_like(version: u32, entries: &[(u64, &str)]) -> Vec<u8> {
+    let mut buf = Vec::new();
+    buf.extend_from_slice(&version.to_le_bytes());
+    buf.extend_from_slice(&28u32.to_le_bytes());
+    buf.extend_from_slice(&(entries.len() as u32).to_le_bytes());
+    buf.extend_from_slice(&1u32.to_le_bytes());
+    buf.extend_from_slice(&0u64.to_le_bytes());
+    buf.extend_from_slice(&0u64.to_le_bytes());
+    assert_eq!(buf.len(), 32);
+    for &(last_used_ft, stream_name) in entries {
+        let name_units: Vec<u16> = stream_name.encode_utf16().collect();
+        let name_bytes: Vec<u8> = name_units.iter().flat_map(|u| u.to_le_bytes()).collect();
+        let mut entry = vec![0u8; 80];
+        entry[0..8].copy_from_slice(&last_used_ft.to_le_bytes());
+        entry[40..48].copy_from_slice(&(last_used_ft + 1).to_le_bytes());
+        entry[48..56].copy_from_slice(&(last_used_ft + 2).to_le_bytes());
+        let name_units_only = name_units.len() as u32;
+        entry[28..32].copy_from_slice(&name_units_only.to_le_bytes());
+        buf.extend_from_slice(&entry);
+        buf.extend_from_slice(&name_bytes);
+        buf.extend_from_slice(&0u32.to_le_bytes());
+    }
+    buf
+}
+
+/// 合成 CFB container bytes を構築する（AutomaticDestinations-ms 形式・hand-crafted）。
+///
+/// 指定した stream 群を mini stream cutoff (4096 byte) 未満で格納する前提。
+/// sector size は 512 byte（CFB v3）。
+pub fn build_automatic_destinations(streams: &[(&str, &[u8])]) -> Vec<u8> {
+    let sector_size: usize = 512;
+    let mini_sector_size: usize = 64;
+    let mini_cutoff: u32 = 4096;
+
+    // 1. directory entry 数（root + N stream）と必要 sector 計算。
+    // 各 stream は mini stream へ格納（< 4096 byte を前提）。
+    let mut mini_stream_bytes: Vec<u8> = Vec::new();
+    let mut stream_start_mini_sector: Vec<u32> = Vec::with_capacity(streams.len());
+    for (_, data) in streams {
+        // align to mini sector size.
+        while !mini_stream_bytes.len().is_multiple_of(mini_sector_size) {
+            mini_stream_bytes.push(0);
+        }
+        stream_start_mini_sector.push((mini_stream_bytes.len() / mini_sector_size) as u32);
+        mini_stream_bytes.extend_from_slice(data);
+    }
+    // pad mini stream to sector size multiple.
+    while !mini_stream_bytes.len().is_multiple_of(sector_size) {
+        mini_stream_bytes.push(0);
+    }
+    let mini_stream_sectors = if mini_stream_bytes.is_empty() {
+        0
+    } else {
+        mini_stream_bytes.len() / sector_size
+    };
+
+    // 2. FAT sector 配置を計算。
+    // sector 割当:
+    //   sector 0: FAT sector 自身
+    //   sector 1: directory sector 0
+    //   sector 2: directory sector 1 (必要なら)
+    //   sector 3..: mini FAT sector (1 つで十分)
+    //   sector N..: mini stream sectors
+    //
+    // directory entries: root + streams。各 128 byte。1 sector (512 byte) に 4 entry。
+    let total_dir_entries = 1 + streams.len();
+    let dir_sectors_needed = (total_dir_entries * DIR_ENTRY_BYTES)
+        .div_ceil(sector_size)
+        .max(1);
+    let mini_fat_sectors_needed: u32 = if streams.is_empty() { 0 } else { 1 };
+
+    // sector 割当開始:
+    //   0 = FAT 自身
+    //   1..1+dir_sectors = directory
+    //   次に mini FAT sectors
+    //   次に mini stream sectors
+    let fat_sector: u32 = 0;
+    let dir_sector_start: u32 = 1;
+    let mini_fat_sector_start: u32 = dir_sector_start + dir_sectors_needed as u32;
+    let mini_stream_sector_start: u32 = mini_fat_sector_start + mini_fat_sectors_needed;
+    let total_sectors: u32 = mini_stream_sector_start + mini_stream_sectors as u32;
+
+    // 3. FAT 配列を構築。
+    let fat_entries = total_sectors as usize;
+    let mut fat = vec![0xFFFF_FFFFu32; fat_entries];
+    fat[fat_sector as usize] = 0xFFFF_FFFD; // FATSECT
+    // directory chain (1..1+dir_sectors).
+    for i in 0..dir_sectors_needed {
+        let s = (dir_sector_start as usize) + i;
+        fat[s] = if i + 1 < dir_sectors_needed {
+            (s + 1) as u32
+        } else {
+            0xFFFF_FFFE
+        };
+    }
+    // mini FAT chain (1 sector 固定).
+    if mini_fat_sectors_needed > 0 {
+        fat[mini_fat_sector_start as usize] = 0xFFFF_FFFE;
+    }
+    // mini stream chain.
+    for i in 0..mini_stream_sectors {
+        let s = (mini_stream_sector_start as usize) + i;
+        fat[s] = if i + 1 < mini_stream_sectors {
+            (s + 1) as u32
+        } else {
+            0xFFFF_FFFE
+        };
+    }
+
+    // 4. mini FAT 配列を構築（1 sector = 128 entry）。
+    let mut mini_fat = vec![0xFFFF_FFFFu32; sector_size / 4];
+    // stream の mini sector chain は ENDOFCHAIN（1 stream = 連続 mini sector 数 byte）。
+    for (idx, (_, data)) in streams.iter().enumerate() {
+        let start = stream_start_mini_sector[idx];
+        let stream_byte_len = data.len();
+        let n_mini_sectors = stream_byte_len.div_ceil(mini_sector_size);
+        for i in 0..n_mini_sectors {
+            let m = (start as usize) + i;
+            if m >= mini_fat.len() {
+                break;
+            }
+            mini_fat[m] = if i + 1 < n_mini_sectors {
+                (m + 1) as u32
+            } else {
+                0xFFFF_FFFE
+            };
+        }
+    }
+
+    // 5. 全体 bytes を構築。
+    let total_bytes = CFB_HEADER_BYTES + (total_sectors as usize) * sector_size;
+    let mut buf = vec![0u8; total_bytes];
+
+    // --- header (512 byte) ---
+    buf[0..8].copy_from_slice(&CFB_SIGNATURE);
+    buf[26..28].copy_from_slice(&3u16.to_le_bytes()); // major version 3
+    buf[28..30].copy_from_slice(&0xFFFEu16.to_le_bytes()); // byte order
+    buf[30..32].copy_from_slice(&9u16.to_le_bytes()); // sector_shift = 9 (512)
+    buf[32..34].copy_from_slice(&6u16.to_le_bytes()); // mini_shift = 6 (64)
+    buf[40..44].copy_from_slice(&0u32.to_le_bytes()); // total dir sectors (v3 では 0)
+    buf[44..48].copy_from_slice(&1u32.to_le_bytes()); // total FAT sectors
+    buf[48..52].copy_from_slice(&dir_sector_start.to_le_bytes()); // first dir sector
+    buf[56..60].copy_from_slice(&mini_cutoff.to_le_bytes()); // mini cutoff
+    buf[60..64].copy_from_slice(&mini_fat_sector_start.to_le_bytes()); // first mini FAT sector
+    buf[64..68].copy_from_slice(&mini_fat_sectors_needed.to_le_bytes()); // total mini FAT sectors
+    buf[68..72].copy_from_slice(&0xFFFF_FFFEu32.to_le_bytes()); // first DIFAT (ENDOFCHAIN)
+    buf[72..76].copy_from_slice(&0u32.to_le_bytes()); // total DIFAT sectors
+    buf[76..80].copy_from_slice(&fat_sector.to_le_bytes()); // DIFAT[0] = FAT sector
+    for i in 1..109 {
+        let off = 76 + i * 4;
+        buf[off..off + 4].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes()); // FREESECT
+    }
+
+    // --- FAT sector (sector 0) ---
+    let fat_off = CFB_HEADER_BYTES + (fat_sector as usize) * sector_size;
+    for (i, v) in fat.iter().enumerate() {
+        buf[fat_off + i * 4..fat_off + i * 4 + 4].copy_from_slice(&v.to_le_bytes());
+    }
+
+    // --- directory sectors (sector 1..) ---
+    let dir_off = CFB_HEADER_BYTES + (dir_sector_start as usize) * sector_size;
+    // entry 0 = root entry.
+    buf[dir_off + 2] = 5; // type = root
+    buf[dir_off + 4..dir_off + 8].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes()); // left
+    buf[dir_off + 8..dir_off + 12].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes()); // right
+    buf[dir_off + 12..dir_off + 16].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes()); // child
+    // root entry name = "Root Entry"
+    let root_name: &[u16] = &[
+        'R' as u32 as u16,
+        'o' as u32 as u16,
+        'o' as u32 as u16,
+        't' as u32 as u16,
+        ' ' as u32 as u16,
+        'E' as u32 as u16,
+        'n' as u32 as u16,
+        't' as u32 as u16,
+        'r' as u32 as u16,
+        'y' as u32 as u16,
+    ];
+    let root_name_bytes: Vec<u8> = root_name.iter().flat_map(|u| u.to_le_bytes()).collect();
+    buf[dir_off + 4..dir_off + 4 + root_name_bytes.len()].copy_from_slice(&root_name_bytes);
+    let root_name_len_bytes = ((root_name.len() + 1) * 2) as u16;
+    buf[dir_off..dir_off + 2].copy_from_slice(&root_name_len_bytes.to_le_bytes());
+    // root entry: starting sector = mini stream sector start, size = mini stream bytes。
+    buf[dir_off + 52..dir_off + 56].copy_from_slice(&mini_stream_sector_start.to_le_bytes());
+    let mini_stream_size = mini_stream_bytes.len() as u64;
+    buf[dir_off + 56..dir_off + 60]
+        .copy_from_slice(&((mini_stream_size & 0xFFFF_FFFF) as u32).to_le_bytes());
+    buf[dir_off + 60..dir_off + 64]
+        .copy_from_slice(&(((mini_stream_size >> 32) & 0xFFFF_FFFF) as u32).to_le_bytes());
+
+    // entries 1.. = stream entries.
+    for (idx, (name, data)) in streams.iter().enumerate() {
+        let entry_off = dir_off + (idx + 1) * DIR_ENTRY_BYTES;
+        buf[entry_off + 2] = 2; // type = stream
+        buf[entry_off + 4..entry_off + 8].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+        buf[entry_off + 8..entry_off + 12].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+        buf[entry_off + 12..entry_off + 16].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+        // stream name (UTF-16LE・null 終端)。
+        let name_units: Vec<u16> = name.encode_utf16().collect();
+        let name_bytes: Vec<u8> = name_units.iter().flat_map(|u| u.to_le_bytes()).collect();
+        let name_len_with_null_bytes = ((name_units.len() + 1) * 2) as u16;
+        buf[entry_off..entry_off + 2].copy_from_slice(&name_len_with_null_bytes.to_le_bytes());
+        let name_field_off = entry_off + 4;
+        buf[name_field_off..name_field_off + name_bytes.len()].copy_from_slice(&name_bytes);
+        // starting mini sector.
+        buf[entry_off + 52..entry_off + 56]
+            .copy_from_slice(&stream_start_mini_sector[idx].to_le_bytes());
+        // size。
+        let size = data.len() as u64;
+        buf[entry_off + 56..entry_off + 60]
+            .copy_from_slice(&((size & 0xFFFF_FFFF) as u32).to_le_bytes());
+        buf[entry_off + 60..entry_off + 64]
+            .copy_from_slice(&(((size >> 32) & 0xFFFF_FFFF) as u32).to_le_bytes());
+    }
+
+    // --- mini FAT sector ---
+    if mini_fat_sectors_needed > 0 {
+        let mini_fat_off = CFB_HEADER_BYTES + (mini_fat_sector_start as usize) * sector_size;
+        for (i, v) in mini_fat.iter().enumerate() {
+            buf[mini_fat_off + i * 4..mini_fat_off + i * 4 + 4].copy_from_slice(&v.to_le_bytes());
+        }
+    }
+
+    // --- mini stream sectors ---
+    if !mini_stream_bytes.is_empty() {
+        let mini_stream_off = CFB_HEADER_BYTES + (mini_stream_sector_start as usize) * sector_size;
+        buf[mini_stream_off..mini_stream_off + mini_stream_bytes.len()]
+            .copy_from_slice(&mini_stream_bytes);
+    }
+
+    buf
+}
+
+/// CFB signature（[MS-CFB] §2.2）。
+pub const CFB_SIGNATURE: [u8; 8] = [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1];
+/// CFB header の byte 長（[MS-CFB] §2.2）。
+pub const CFB_HEADER_BYTES: usize = 512;
+/// directory entry の byte 長。
+const DIR_ENTRY_BYTES: usize = 128;
+
+/// 合成 CustomDestinations-ms bytes を構築する（hand-crafted）。
+pub fn build_custom_destinations(categories: &[(u32, &[Vec<u8>])]) -> Vec<u8> {
+    let mut buf = Vec::new();
+    // 16 byte file header。
+    buf.extend_from_slice(&1u32.to_le_bytes());
+    buf.extend_from_slice(&0xC4D2_D89Eu32.to_le_bytes());
+    buf.extend_from_slice(&2u32.to_le_bytes());
+    buf.extend_from_slice(&0u32.to_le_bytes());
+
+    for &(category_type, entries) in categories {
+        buf.extend_from_slice(&category_type.to_le_bytes());
+        buf.extend_from_slice(&(entries.len() as u32).to_le_bytes());
+        for lnk in entries {
+            buf.extend_from_slice(&0x0000_0003u32.to_le_bytes()); // entry point type
+            buf.extend_from_slice(lnk);
+        }
+    }
+    // terminator。
+    buf.extend_from_slice(&0x0000_0000u32.to_le_bytes());
+    buf
+}

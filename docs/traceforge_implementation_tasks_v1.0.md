@@ -263,11 +263,11 @@
 
 ### 7.8 Jump Lists Parser
 
-- [ ] T4-070 CFB container 解析（AutomaticDestinations、互換 §4.5）
-- [ ] T4-071 DestList 解析（未知 version は Warning、互換 §4.5）
-- [ ] T4-072 内包 LNK の ArtifactInstance 化（stream 名 + offset を Provenance、互換 §4.5）
-- [ ] T4-073 CustomDestinations 解析（互換 §4.5）
-- [ ] T4-074 Jump Lists fixture + acceptance test（3 OS 世代、互換 §4.5）
+- [x] T4-070 CFB container 解析（AutomaticDestinations、互換 §4.5）
+- [x] T4-071 DestList 解析（未知 version は Warning、互換 §4.5）
+- [x] T4-072 内包 LNK の ArtifactInstance 化（stream 名 + offset を Provenance、互換 §4.5）
+- [x] T4-073 CustomDestinations 解析（互換 §4.5）
+- [x] T4-074 Jump Lists fixture + acceptance test（3 OS 世代、互換 §4.5）
 
 ### 7.9 Parser 共通検証
 

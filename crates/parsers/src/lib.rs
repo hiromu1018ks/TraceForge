@@ -8,7 +8,8 @@
 //! - EVTX（[`evtx`]、libyal libevtx 仕様、互換 §4.2）— binxml decoder 付き record-stream 型
 //! - Registry（[`registry`]、MS-RRMF / libyal libregf、互換 §4.7）— hive 構造 + LOG1/LOG2 dual view
 //! - Amcache（[`amcache`]、MS-RRMF hive + Inventory schema、互換 §4.6）— Win10 22H2 / Win11 24H2
-//! - 残り1種（Jump Lists）は順次追加
+//! - Jump Lists（[`jump_lists`]、[MS-CFB] + [MS-DESTS] + 内包 [MS-SHLLINK]、互換 §4.5）—
+//!   AutomaticDestinations / CustomDestinations・3 OS 世代対応
 //!
 //! ## 設計の要点
 //!
@@ -26,6 +27,12 @@
 //! - **Amcache**: Amcache.hve への record の存在は観測であり process start へは断定しない。
 //!   `amcache_observation`（観測）のみを生成する（互換 §4.6）。未知 schema は Warning で
 //!   skip し、Generic Registry Parser への自動 fallback は行わない（互換 §4.6・§4.7）。
+//! - **Jump Lists**: AutomaticDestinations は CFB container・DestList stream・内包 LNK から成る。
+//!   CustomDestinations は独自形式 + 内包 LNK。本 Parser は
+//!   `jump_list_observation`（観測）のみを生成し、target を「開いた」「起動した」と断定
+//!   しない（互換 §4.5）。内包 LNK は物理 Evidence へ登録せず Jump List 内の ArtifactInstance
+//!   として扱い、stream 名 + offset を Provenance へ保存する。未知 DestList version は
+//!   Warning Issue へ記録し container 全体を誤解析しない（互換 §4.5）。
 //! - **EventStoreSink**: [`sink::EventStoreSink`] が [`tf_store::EventStore`] への
 //!   [`framework::ParseSink`] 適応を提供し、Parser → Event Store の縦割りを結ぶ。
 
@@ -33,6 +40,7 @@ pub mod amcache;
 pub mod evtx;
 pub mod framework;
 pub mod issue;
+pub mod jump_lists;
 pub mod lnk;
 pub mod prefetch;
 pub mod registry;
@@ -51,6 +59,10 @@ pub use evtx::{
 pub use framework::{
     ArtifactParser, ParseContext, ParseSink, ParseSummary, ReadSeek, SinkError,
     run_parser_catching_panic,
+};
+pub use jump_lists::{
+    JUMP_LIST_OBSERVATION_EVENT_TYPE, JUMP_LIST_REFERENCE, JumpListParser,
+    PARSER_ID as JUMP_LIST_PARSER_ID, PARSER_VERSION as JUMP_LIST_PARSER_VERSION,
 };
 pub use lnk::{LnkParser, PARSER_ID as LNK_PARSER_ID, PARSER_VERSION as LNK_PARSER_VERSION};
 pub use prefetch::{
