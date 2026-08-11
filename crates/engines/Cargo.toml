@@ -9,3 +9,17 @@ publish.workspace = true
 
 [lints]
 workspace = true
+
+[dependencies]
+# Phase 1 のコアデータモデル（ExitCode・sha256_hex・Issue・Config 等）
+tf-core = { path = "../core", version = "0.1.0" }
+# Rule file raw bytes の SHA-256 計算（規範 §14）
+sha2.workspace = true
+# SHA-256 digest の lowercase hex 変換（規範 §14・Schema §2.1）
+hex.workspace = true
+# Error 型 derive（規範 §17.2）
+thiserror.workspace = true
+
+[dev-dependencies]
+# テスト用一時 directory（Rule directory 構築・dedup 検証等）
+tempfile = "3"

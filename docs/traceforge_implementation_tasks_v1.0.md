@@ -281,9 +281,9 @@
 
 ### 8.1 共通
 
-- [ ] T5-001 Rule file 1回読み込み・raw bytes SHA-256・再読込禁止（規範 §14）
-- [ ] T5-002 Rule directory 列挙順の正規化（UTF-8 byte 順、規範 §14）
-- [ ] T5-003 Rule validation error の Exit Code 5 対応（規範 §17.2）
+- [x] T5-001 Rule file 1回読み込み・raw bytes SHA-256・再読込禁止（規範 §14）
+- [x] T5-002 Rule directory 列挙順の正規化（UTF-8 byte 順、規範 §14）
+- [x] T5-003 Rule validation error の Exit Code 5 対応（規範 §17.2）
 
 ### 8.2 Sigma
 

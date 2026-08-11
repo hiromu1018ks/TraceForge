@@ -1223,6 +1223,13 @@ dependencies = [
 [[package]]
 name = "tf-engines"
 version = "0.1.0"
+dependencies = [
+ "hex",
+ "sha2",
+ "tempfile",
+ "tf-core",
+ "thiserror",
+]
 
 [[package]]
 name = "tf-evidence"

@@ -67,7 +67,7 @@ mise でローカル環境を管理する場合は `.mise.toml` でバージョ�
 CI（`.github/workflows/ci.yml`）は push / pull_request で上記を自動実行する。
 fuzz target の link は Windows MSVC 環境で失敗する（libfuzzer-sys のエントリポイント制約）ため、Linux CI で担保する。
 
-### 依存構成（Phase 4 更新）
+### 依存構成（Phase 5 共通編 更新）
 
 - workspace 共通依存はルート `Cargo.toml` の `[workspace.dependencies]` へ一元管理し、各 crate は `<dep>.workspace = true` で継承する。version は `Cargo.lock` へ pin され、cargo-deny で再現性と供給連鎖安全を担保する。
 - `tf-core` が Phase 1 で追加した依存: `sha2`（SHA-256）、`hex`（lowercase hex）、`serde` / `serde_json`（canonical JSON・Case JSON）、`jsonschema`（Draft 2020-12、default-features を切って `draft202012` のみ有効化・外部通信なし）、`chrono` / `chrono-tz`（EventTime・IANA timezone・DST）、`toml`（設定 load）、`thiserror`（Error 型 derive）。
@@ -81,8 +81,13 @@ fuzz target の link は Windows MSVC 環境で失敗する（libfuzzer-sys の�
 - `tf-evidence` の統合テストは `crates/evidence/tests/` 配下（`acceptance_tests.rs`）。規範 §21 の受け入れ条件（§21-3・§21-4・§21-9・§21-10）を検証する。
 - `tf-store` の統合テストは `crates/store/tests/` 配下（`acceptance_tests.rs`）。規範 §21 の受け入れ条件（§21-2・§21-6・§21-8）を検証する。
 - `tf-parsers` の統合テストは `crates/parsers/tests/` 配下（`framework_tests.rs`・`lnk_tests.rs`・`prefetch_tests.rs`・`usn_tests.rs`・`evtx_tests.rs`・`registry_tests.rs`・`amcache_tests.rs`・`jump_lists_tests.rs`・`acceptance_tests.rs`・`thread_consistency_tests.rs`・`provenance_reachability_tests.rs`）。規範 §9（Parser 契約）・互換 §4.1（Prefetch）・互換 §4.2（EVTX）・互換 §4.3（USN）・互換 §4.4（LNK）・互換 §4.6（Amcache）・互換 §4.7（Registry）・互換 §12（acceptance 8条件）・M2 縦割き・T4-090（thread 数 1/複数一致）・T4-091（Provenance 到達）を検証する。共通ヘルパー（合成 LNK fixture 生成・合成 Prefetch fixture 生成・合成 USN V2/V3/V4 fixture 生成・合成 EVTX file/chunk/record/binxml fixture 生成・合成 Registry hive fixture ビルダ（`RegistryFixtureBuilder`・`RegistryKeySpec`・`RegistryValueSpec`）・合成 LOG fixture ビルダ（TFLOG）・literal-only MAM 圧縮・snapshot・ArtifactInstance 構築）は `tests/common/mod.rs`。合成 Amcache fixture は `RegistryFixtureBuilder` をそのまま使用（Amcache.hve も registry hive 形式のため）。
+- `tf-engines` の統合テストは `crates/engines/tests/` 配下（`acceptance_tests.rs`）。規範 §14（Rule file 1回読込・再読込禁止・directory 列挙順の UTF-8 byte 順）・規範 §17.2（Rule validation error の Exit Code 5 区分）・T5-001〜T5-003 を検証する。
 - `tf-fuzz`（fuzz crate）が Phase 4 共通検証で追加した依存: `tf-parsers`（path 指定・全 Parser への fuzz target 用）。fuzz target は `fuzz/fuzz_targets/` 配下（`core.rs`・`lnk.rs`・`prefetch.rs`・`usn.rs`・`evtx.rs`・`registry.rs`・`amcache.rs`・`jump_lists.rs`）。各 Parser fuzz target は `run_parser_catching_panic` 経由で破損入力でも panic しないことを検証する（F-025）。Windows MSVC では libfuzzer-sys の link が失敗するため、本プロジェクトでは `cargo check --manifest-path fuzz/Cargo.toml` でビルド検証し、実際の fuzz 実行は Linux CI で行う。
 - `tf-core` の `time.rs` へ Phase 3 で `TimePrecision` / `TimezoneSource` / `TimestampKind` の `from_schema_str` メソッドを追加した（Event 復元に必要な lowercase 文字列からの変換）。
 - `tf-parsers` の依存方向: `tf-parsers` → `tf-core`/`tf-evidence`/`tf-store`（本番依存）。`tf-store` は `tf-parsers` へ依存しない（EventStoreSink を tf-parsers 側へ置くことで循環を回避）。M2 縦割りは tf-parsers の統合テストで実施する。
+- `tf-engines` が Phase 5 共通編で追加した依存: `tf-core`（path + version 指定、ExitCode・sha256_hex・Config・hash 検証）、`sha2`・`hex`（Rule file raw bytes の SHA-256 計算・規範 §14）、`thiserror`（RuleLoadError derive・規範 §17.2）。dev-dependency に `tempfile`（テスト用一時 directory）。YAML parser・YARA-X crate は共通編では未導入（Sigma T5-010・Correlation T5-030・YARA-X T5-020 で個別導入する）。
+- `tf-engines` の module 構成（Phase 5 共通編）: `src/lib.rs`（公開 API）・`src/loader.rs`（`RuleRegistry`・`LoadedRuleFile`・`RuleLoadOptions`・`discover_rule_directory`・`load_directory`・`RuleLoadError`・Exit Code 変換）・`src/path_norm.rs`（Rule file 用相対 path 正規化）。統合テストは `crates/engines/tests/acceptance_tests.rs`（T5-001〜T5-003 受け入れ条件）。
+- `tf-engines` の依存方向: `tf-engines` → `tf-core`（本番依存）。`tf-evidence`/`tf-store`/`tf-parsers` へは依存しない（Rule file 取扱は Evidence snapshot・EventStore・Parser へ影響しないため）。Sigma・Correlation が Evidence ID 参照等で必要になれば個別 engine 実装時に追加する。
+- `tf-fuzz`（fuzz crate）が Phase 5 共通編で追加した依存: `tf-engines`（path 指定・Rule loader fuzz target 用）・`tempfile`（fuzz target が一時 file を作るため）。fuzz target は `fuzz/fuzz_targets/` 配下（`core.rs`・`lnk.rs`・`prefetch.rs`・`usn.rs`・`evtx.rs`・`registry.rs`・`amcache.rs`・`jump_lists.rs`・`rule_loader.rs`）。`rule_loader.rs` は RuleRegistry::load へ乱雑 byte 列を投げ、panic しないことを検証する（F-025）。
 
 **ビルド・test・lint 等のコマンドや構成を新規導入・変更したら、その時点で本ファイルへ追記・更新すること。**

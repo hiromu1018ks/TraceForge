@@ -12,8 +12,11 @@ cargo-fuzz = true
 libfuzzer-sys = "0.4"
 # tf-core・tf-parsers の関数を fuzz 対象とする。
 # Phase 1 で core を、Phase 4 共通検証（T4-092）で parsers を追加した。
+# Phase 5 共通編（T5-001）で engines を追加した。
 tf-core = { path = "../crates/core" }
+tf-engines = { path = "../crates/engines" }
 tf-parsers = { path = "../crates/parsers" }
+tempfile = "3"
 
 # cargo-fuzz 雛形 target（T0-010、F-025、製品 §13.1）。
 # Phase 1 以降で core の各関数（決定的 ID・Windows path・canonical JSON 等）の
@@ -66,6 +69,14 @@ doc = false
 [[bin]]
 name = "jump_lists"
 path = "fuzz_targets/jump_lists.rs"
+test = false
+doc = false
+
+# Phase 5 共通編（T5-001）: Rule loader の fuzz target。
+# 破損 raw bytes・境界値 size 入力でも panic しないことを継続的 fuzzing で検証する。
+[[bin]]
+name = "rule_loader"
+path = "fuzz_targets/rule_loader.rs"
 test = false
 doc = false
 
