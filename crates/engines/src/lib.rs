@@ -18,6 +18,8 @@
 
 pub mod loader;
 pub mod path_norm;
+pub mod sigma;
+pub mod yaml;
 
 pub use loader::{
     DiscoveredRuleFile, DiscoveryOutcome, LoadedRuleFile, MAX_RULE_FILES_LIMIT_CODE,
@@ -25,3 +27,5 @@ pub use loader::{
     RuleRegistry, SYMLINK_SKIP_CODE, discover_rule_directory,
 };
 pub use path_norm::{RulePathError, normalize_rule_relative_path};
+pub use sigma::evaluator::{CompiledSigmaRule, SigmaMatchResult};
+pub use sigma::rule::{SigmaError, SigmaRule};

@@ -287,14 +287,14 @@
 
 ### 8.2 Sigma
 
-- [ ] T5-010 Sigma YAML parser + TF-SIGMA-1.0 subset validator（互換 §6.1–6.2）
-- [ ] T5-011 未対応要素含有 Rule の全体 skip（部分評価禁止、互換 §6.2、規範 §15.1）
-- [ ] T5-012 logsource routing（category/product/service/definition、互換 §6.1）
-- [ ] T5-013 selection / condition / quantifier 評価器（互換 §6.1）
-- [ ] T5-014 string/field/list modifier（contains・startswith・endswith・cased・exists・all、互換 §6.1）
-- [ ] T5-015 field mapping 実装（互換 §6.3 表、複数候補の OR 評価禁止）
-- [ ] T5-016 Sigma match → Match 型変換（logsource_mapping 保持、Schema §5.7）
-- [ ] T5-017 Sigma 未対応構文 skip test（規範 §21-12）
+- [x] T5-010 Sigma YAML parser + TF-SIGMA-1.0 subset validator（互換 §6.1–6.2）
+- [x] T5-011 未対応要素含有 Rule の全体 skip（部分評価禁止、互換 §6.2、規範 §15.1）
+- [x] T5-012 logsource routing（category/product/service/definition、互換 §6.1）
+- [x] T5-013 selection / condition / quantifier 評価器（互換 §6.1）
+- [x] T5-014 string/field/list modifier（contains・startswith・endswith・cased・exists・all、互換 §6.1）
+- [x] T5-015 field mapping 実装（互換 §6.3 表、複数候補の OR 評価禁止）
+- [x] T5-016 Sigma match → Match 型変換（logsource_mapping 保持、Schema §5.7）
+- [x] T5-017 Sigma 未対応構文 skip test（規範 §21-12）
 
 ### 8.3 YARA-X
 

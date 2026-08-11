@@ -80,6 +80,14 @@ path = "fuzz_targets/rule_loader.rs"
 test = false
 doc = false
 
+# Phase 5 Sigma 編（T5-010〜T5-017）: Sigma evaluator の fuzz target。
+# 破損 YAML・不正 Sigma 構文入力でも panic しないことを継続的 fuzzing で検証する。
+[[bin]]
+name = "sigma"
+path = "fuzz_targets/sigma.rs"
+test = false
+doc = false
+
 # 親 workspace から独立した fuzz 専用 workspace とする。
 # cargo-fuzz は libfuzzer-sys を用い、fuzz target のビルド要件が
 # メイン workspace と異なるため、fmt/clippy/test/doc の対象から切り離す。
