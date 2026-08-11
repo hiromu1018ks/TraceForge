@@ -254,12 +254,12 @@
 
 ### 7.7 Amcache Parser
 
-- [ ] T4-060 Win10 22H2 / Win11 24H2 schema family 認識（互換 §4.6）
-- [ ] T4-061 key family と file/program metadata 保持（互換 §4.6・§5）
-- [ ] T4-062 `amcache_observation` Event（process start へ断定しない、互換 §4.6）
-- [ ] T4-063 未知 schema は Warning（Generic Registry へ自動 fallback 禁止、互換 §4.6）
-- [ ] T4-064 Registry Parser との明示的併用（互換 §4.7）
-- [ ] T4-065 Amcache fixture + acceptance test（互換 §12）
+- [x] T4-060 Win10 22H2 / Win11 24H2 schema family 認識（互換 §4.6）
+- [x] T4-061 key family と file/program metadata 保持（互換 §4.6・§5）
+- [x] T4-062 `amcache_observation` Event（process start へ断定しない、互換 §4.6）
+- [x] T4-063 未知 schema は Warning（Generic Registry へ自動 fallback 禁止、互換 §4.6）
+- [x] T4-064 Registry Parser との明示的併用（互換 §4.7）
+- [x] T4-065 Amcache fixture + acceptance test（互換 §12）
 
 ### 7.8 Jump Lists Parser
 

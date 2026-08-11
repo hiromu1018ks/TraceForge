@@ -7,7 +7,8 @@
 //! - USN Journal（[`usn`]、Microsoft USN_RECORD_V2/V3/V4、互換 §4.3）— record-stream 型
 //! - EVTX（[`evtx`]、libyal libevtx 仕様、互換 §4.2）— binxml decoder 付き record-stream 型
 //! - Registry（[`registry`]、MS-RRMF / libyal libregf、互換 §4.7）— hive 構造 + LOG1/LOG2 dual view
-//! - 残り2種（Amcache / Jump Lists）は順次追加
+//! - Amcache（[`amcache`]、MS-RRMF hive + Inventory schema、互換 §4.6）— Win10 22H2 / Win11 24H2
+//! - 残り1種（Jump Lists）は順次追加
 //!
 //! ## 設計の要点
 //!
@@ -22,9 +23,13 @@
 //!   同時検証を満たした場合のみ適用する（互換 §4.2）。Registry は `registry_observation`
 //!   と `registry_key_last_write`（観測）とし、`registry_set` / `registry_delete` は生成しない
 //!   （互換 §4.7）。
+//! - **Amcache**: Amcache.hve への record の存在は観測であり process start へは断定しない。
+//!   `amcache_observation`（観測）のみを生成する（互換 §4.6）。未知 schema は Warning で
+//!   skip し、Generic Registry Parser への自動 fallback は行わない（互換 §4.6・§4.7）。
 //! - **EventStoreSink**: [`sink::EventStoreSink`] が [`tf_store::EventStore`] への
 //!   [`framework::ParseSink`] 適応を提供し、Parser → Event Store の縦割りを結ぶ。
 
+pub mod amcache;
 pub mod evtx;
 pub mod framework;
 pub mod issue;
@@ -35,6 +40,10 @@ pub mod sink;
 pub mod usn;
 
 // よく使う主要型をルートへ再公開。
+pub use amcache::{
+    AMCACHE_OBSERVATION_EVENT_TYPE, AMCACHE_REFERENCE, AmcacheParser,
+    PARSER_ID as AMCACHE_PARSER_ID, PARSER_VERSION as AMCACHE_PARSER_VERSION,
+};
 pub use evtx::mapping::EVENT_LOGGED_TYPE as EVTX_EVENT_LOGGED_TYPE;
 pub use evtx::{
     EVTX_REFERENCE, EvtxParser, PARSER_ID as EVTX_PARSER_ID, PARSER_VERSION as EVTX_PARSER_VERSION,

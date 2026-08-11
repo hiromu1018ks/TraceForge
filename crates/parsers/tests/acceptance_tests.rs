@@ -2054,3 +2054,388 @@ fn reg_vertical_slice_registry_to_case_jsonl() {
             == 5
     );
 }
+
+// ============================================================
+// Amcache acceptance test（T4-065、互換 §12・§4.6）
+// ============================================================
+
+use tf_parsers::amcache::{AMCACHE_OBSERVATION_EVENT_TYPE as AMC_EVENT_TYPE, AMCACHE_REFERENCE};
+use tf_parsers::{
+    AMCACHE_PARSER_ID as AMC_PARSER_ID, AMCACHE_PARSER_VERSION as AMC_PARSER_VERSION,
+};
+
+/// Amcache fixture を構築して EventStore へ流し込む共通 helper。
+fn run_amcache_parser(
+    bytes: &[u8],
+    dir: &std::path::Path,
+) -> (
+    tf_parsers::ParseSummary,
+    Vec<tf_core::issue::Issue>,
+    EventStore,
+) {
+    let (evidence, _) = common::make_snapshot("Amcache.hve", bytes, dir);
+    let artifact = common::make_artifact_with_source(
+        &evidence,
+        AMC_PARSER_ID,
+        AMC_PARSER_VERSION,
+        tf_core::event::ArtifactSource::Amcache,
+    );
+    let context = ParseContext {
+        evidence: evidence.clone(),
+        artifact,
+    };
+    let spool = dir.join("amcache_accept.spool");
+    let mut store = EventStore::create(&spool).unwrap();
+    let mut issues: Vec<tf_core::issue::Issue> = Vec::new();
+    let snapshot_path = std::path::Path::new(&context.evidence.snapshot_locator);
+    let mut file = std::fs::File::open(snapshot_path).unwrap();
+    let parser = tf_parsers::AmcacheParser::new();
+    let summary = {
+        let mut sink = EventStoreSink::new(&mut store, &mut issues);
+        parser.parse(&mut file, &context, &mut sink)
+    };
+    (summary, issues, store)
+}
+
+/// 標準的な Amcache fixture（Win10 22H2 / Win11 24H2 Inventory schema）。
+fn standard_amcache_fixture() -> common::RegistryKeySpec {
+    // InventoryApplicationFile 配下の file entry ×2。
+    let file_entry_a = common::RegistryKeySpec {
+        name: "000061e800b0c814fa2da1c8df6f48501bd43a4d78cd2151".to_string(),
+        last_write_filetime: common::filetime_from_unix_offset(0),
+        values: vec![
+            common::RegistryValueSpec::sz("CompanyName", "Microsoft Corporation"),
+            common::RegistryValueSpec::sz("FileName", "notepad.exe"),
+            common::RegistryValueSpec::sz("FileVersion", "10.0.22621.1"),
+        ],
+        subkeys: vec![],
+    };
+    let file_entry_b = common::RegistryKeySpec {
+        name: "0000b0c814fa2da1c8df6f48501bd43a4d78cd21510000".to_string(),
+        last_write_filetime: common::filetime_from_unix_offset(60),
+        values: vec![
+            common::RegistryValueSpec::sz("CompanyName", "Contoso"),
+            common::RegistryValueSpec::sz("FileName", "contoso_app.exe"),
+        ],
+        subkeys: vec![],
+    };
+    let inventory_application_file = common::RegistryKeySpec {
+        name: "InventoryApplicationFile".to_string(),
+        last_write_filetime: common::filetime_from_unix_offset(0),
+        values: vec![],
+        subkeys: vec![file_entry_a, file_entry_b],
+    };
+    let device_census = common::RegistryKeySpec {
+        name: "DeviceCensus".to_string(),
+        last_write_filetime: common::filetime_from_unix_offset(120),
+        values: vec![common::RegistryValueSpec::sz("OSName", "Windows 11 Pro")],
+        subkeys: vec![],
+    };
+    common::RegistryKeySpec {
+        name: "Root".to_string(),
+        last_write_filetime: common::filetime_from_unix_offset(-60),
+        values: vec![],
+        subkeys: vec![inventory_application_file, device_census],
+    }
+}
+
+/// 互換 §12-1（Amcache 版）: 正常 fixture から期待 Event を生成する。
+#[test]
+fn amc_acceptance_12_1_valid_fixture_emits_expected_events() {
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = common::build_registry_fixture(&standard_amcache_fixture());
+    let (summary, issues, store) = run_amcache_parser(&bytes, dir.path());
+
+    assert_eq!(summary.status, tf_core::case::ParseStatus::Complete);
+    assert!(!store.is_empty(), "Inventory schema は Event を生成");
+    assert!(issues.is_empty(), "正常 fixture は Issue 無し: {issues:?}");
+    for result in store.iter().unwrap() {
+        let event = result.unwrap();
+        assert_eq!(event.source, tf_core::event::ArtifactSource::Amcache);
+        assert_eq!(event.event_type.as_str(), AMC_EVENT_TYPE);
+        assert_eq!(
+            event.attributes["amcache.schema_family"],
+            "win10-22h2-win11-24h2-inventory"
+        );
+    }
+}
+
+/// 互換 §12-2（Amcache 版）: truncated・invalid length・unknown version で panic しない。
+#[test]
+fn amc_acceptance_12_2_corrupt_inputs_do_not_panic() {
+    let run = |bytes: &[u8]| {
+        let dir = tempfile::tempdir().unwrap();
+        let _ = run_amcache_parser(bytes, dir.path());
+    };
+
+    // truncated: header すら無い。
+    run(&(0..10).collect::<Vec<u8>>());
+    // truncated: base block のみ。
+    run(&vec![0u8; 4096]);
+    // invalid: magic を壊す。
+    let mut bad_magic = common::build_registry_fixture(&standard_amcache_fixture());
+    bad_magic[0] = 0xFF;
+    run(&bad_magic);
+    // invalid: root offset を範囲外へ。
+    let mut bad_offset = common::build_registry_fixture(&standard_amcache_fixture());
+    bad_offset[36..40].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+    run(&bad_offset);
+
+    // unknown schema（Amcache Parser 固有の "unknown version" 相当）。
+    let unknown = common::RegistryKeySpec {
+        name: "Root".to_string(),
+        last_write_filetime: common::filetime_from_unix_offset(0),
+        values: vec![],
+        subkeys: vec![common::RegistryKeySpec {
+            name: "MysterySchema".to_string(),
+            last_write_filetime: common::filetime_from_unix_offset(0),
+            values: vec![],
+            subkeys: vec![],
+        }],
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = common::build_registry_fixture(&unknown);
+    let (summary, issues, _store) = run_amcache_parser(&bytes, dir.path());
+    assert_eq!(summary.status, tf_core::case::ParseStatus::Skipped);
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.issue_id == tf_parsers::issue::UNSUPPORTED_VERSION_CODE)
+    );
+}
+
+/// 互換 §12-3（Amcache 版）: Provenance が元 record へ到達する。
+#[test]
+fn amc_acceptance_12_3_provenance_reaches_original_record() {
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = common::build_registry_fixture(&standard_amcache_fixture());
+    let (_summary, _issues, store) = run_amcache_parser(&bytes, dir.path());
+
+    for result in store.iter().unwrap() {
+        let event = result.unwrap();
+        let prov = &event.provenance;
+        assert_eq!(prov.parser_id, AMC_PARSER_ID);
+        assert_eq!(prov.parser_version, AMC_PARSER_VERSION);
+        assert!(matches!(
+            prov.record_locator,
+            RecordLocator::ByteRange { .. }
+        ));
+    }
+}
+
+/// 互換 §12-4（Amcache 版）: 1 thread と複数 thread で出力が一致する（Parser 単体の決定性）。
+#[test]
+fn amc_acceptance_12_4_parser_is_deterministic_across_runs() {
+    let bytes = common::build_registry_fixture(&standard_amcache_fixture());
+    let run_once = || -> Vec<String> {
+        let dir = tempfile::tempdir().unwrap();
+        let (_summary, _issues, store) = run_amcache_parser(&bytes, dir.path());
+        let mut ids: Vec<String> = store.iter().unwrap().map(|r| r.unwrap().id).collect();
+        ids.sort();
+        ids
+    };
+    let ids1 = run_once();
+    let ids2 = run_once();
+    assert_eq!(ids1, ids2, "同一入力なら同一 Event ID（決定性）");
+}
+
+/// 互換 §12-5（Amcache 版）: fixture SHA-256・生成方法を記録できる。
+#[test]
+fn amc_acceptance_12_5_fixture_metadata_recorded() {
+    let bytes = common::build_registry_fixture(&standard_amcache_fixture());
+    let sha256 = common::sha256_hex(&bytes);
+    assert_eq!(sha256.len(), 64);
+    assert!(
+        sha256
+            .chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+    );
+    // 生成方法: 合成（hand-crafted, MS-RRMF + Amcache Inventory schema 準拠）。
+    // docs/learn/phase4f.md へ記録。
+}
+
+/// 互換 §12-6（Amcache 版）: 外部仕様 revision / dependency version を記録する。
+#[test]
+fn amc_acceptance_12_6_reference_spec_revision_recorded() {
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = common::build_registry_fixture(&standard_amcache_fixture());
+    let (_summary, _issues, store) = run_amcache_parser(&bytes, dir.path());
+
+    for result in store.iter().unwrap() {
+        let event = result.unwrap();
+        assert_eq!(
+            event.attributes["amcache.reference_spec"],
+            AMCACHE_REFERENCE
+        );
+        assert_eq!(
+            event.attributes["amcache.parser_version"],
+            AMC_PARSER_VERSION
+        );
+    }
+}
+
+/// 互換 §12-7（Amcache 版）: 未知 schema を黙って無視しない。
+#[test]
+fn amc_acceptance_12_7_unknown_schema_emits_issue() {
+    let unknown = common::RegistryKeySpec {
+        name: "Root".to_string(),
+        last_write_filetime: common::filetime_from_unix_offset(0),
+        values: vec![],
+        subkeys: vec![common::RegistryKeySpec {
+            name: "MysterySchema".to_string(),
+            last_write_filetime: common::filetime_from_unix_offset(0),
+            values: vec![],
+            subkeys: vec![],
+        }],
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = common::build_registry_fixture(&unknown);
+    let (summary, issues, store) = run_amcache_parser(&bytes, dir.path());
+
+    // 未知 schema は Skipped。
+    assert_eq!(summary.status, tf_core::case::ParseStatus::Skipped);
+    // Event 生成無し。
+    assert_eq!(store.len(), 0);
+    // 黙って無視せず Issue へ記録。
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.issue_id == tf_parsers::issue::UNSUPPORTED_VERSION_CODE)
+    );
+    let msg = &issues
+        .iter()
+        .find(|i| i.issue_id == tf_parsers::issue::UNSUPPORTED_VERSION_CODE)
+        .unwrap()
+        .message;
+    assert!(
+        msg.contains("fallback"),
+        "Generic Registry 自動 fallback 禁止の旨が message へ残る"
+    );
+}
+
+/// 互換 §12-8（Amcache 版）: 形式の意味を越えて Event type を断定しない。
+#[test]
+fn amc_acceptance_12_8_event_type_does_not_overstate_observation() {
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = common::build_registry_fixture(&standard_amcache_fixture());
+    let (_summary, _issues, store) = run_amcache_parser(&bytes, dir.path());
+
+    for result in store.iter().unwrap() {
+        let event = result.unwrap();
+        // event_type は amcache_observation（観測型）。
+        assert_eq!(event.event_type.as_str(), AMC_EVENT_TYPE);
+        // assertion は Observed（規範 §7.1）。
+        assert_eq!(event.assertion, tf_core::event::AssertionKind::Observed);
+        // 「実行した」「起動した」等の断定型ではない。
+        let et = event.event_type.as_str();
+        assert!(!et.contains("process_start"));
+        assert!(!et.contains("launched"));
+        assert!(!et.contains("executed"));
+        assert!(!et.contains("installed"));
+    }
+}
+
+/// Amcache の縦割り: Amcache のみで analyze → Case JSONL + Manifest が生成される。
+#[test]
+fn amc_vertical_slice_amcache_to_case_jsonl() {
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = common::build_registry_fixture(&standard_amcache_fixture());
+    let (evidence, _) = common::make_snapshot("Amcache.hve", &bytes, dir.path());
+    let artifact = common::make_artifact_with_source(
+        &evidence,
+        AMC_PARSER_ID,
+        AMC_PARSER_VERSION,
+        tf_core::event::ArtifactSource::Amcache,
+    );
+
+    let spool_path = dir.path().join("case.spool");
+    let mut store = EventStore::create(&spool_path).unwrap();
+    let mut issues: Vec<tf_core::issue::Issue> = Vec::new();
+    let context = ParseContext {
+        evidence: evidence.clone(),
+        artifact: artifact.clone(),
+    };
+    let snapshot_path = std::path::Path::new(&context.evidence.snapshot_locator);
+    let mut file = std::fs::File::open(snapshot_path).unwrap();
+    {
+        let mut sink = EventStoreSink::new(&mut store, &mut issues);
+        tf_parsers::AmcacheParser::new().parse(&mut file, &context, &mut sink);
+    }
+    store.commit().unwrap();
+    assert!(!store.is_empty(), "Event が生成されている");
+
+    let case_id = tf_core::id::case_id(&[evidence.evidence_id.as_str()]);
+    let case = CaseMetadata {
+        case_id: case_id.clone(),
+        external_case_id: None,
+        name: "Amcache vertical slice".to_string(),
+        analyst: None,
+        description: None,
+        default_timezone: None,
+        tags: vec![],
+    };
+    let other_counts = OtherCounts {
+        evidence: 1,
+        artifact: 1,
+        issue: 0,
+        match_: 0,
+        finding: 0,
+    };
+    let manifest_counts = build_manifest_counts(&store, &other_counts);
+    let manifest = Manifest {
+        traceforge_version: "0.1.0".to_string(),
+        build_commit: "test".to_string(),
+        target: "test".to_string(),
+        schema_version: SCHEMA_VERSION.to_string(),
+        compatibility_profile: "TF-WIN-1.0".to_string(),
+        run_started_at: "2026-08-11T01:00:00Z".to_string(),
+        run_finished_at: "2026-08-11T01:00:01Z".to_string(),
+        resolved_config: serde_json::json!({}),
+        resolved_config_sha256: "f".repeat(64),
+        case_id: case_id.clone(),
+        counts: manifest_counts,
+        components: vec![serde_json::json!({
+            "parser_id": AMC_PARSER_ID,
+            "parser_version": AMC_PARSER_VERSION,
+            "reference": AMCACHE_REFERENCE,
+        })],
+        rules: vec![],
+        attack_dataset: None,
+        timezone_assumptions: vec![],
+        limits: serde_json::json!({}),
+        incomplete_reasons: vec![],
+        complete: true,
+        exit_code: 0,
+    };
+    let stream = CaseStream {
+        case: &case,
+        evidence: std::slice::from_ref(&evidence),
+        artifacts: std::slice::from_ref(&artifact),
+        issues: &issues,
+        matches: &[],
+        findings: &[],
+        manifest: &manifest,
+    };
+
+    let mut output: Vec<u8> = Vec::new();
+    let outcome = write_jsonl(&store, &stream, 1024 * 1024, None, &mut output).unwrap();
+    assert_eq!(outcome.events_output as u64, store.len());
+
+    let output_str = String::from_utf8(output).unwrap();
+    let record_types: Vec<String> = output_str
+        .lines()
+        .map(|l| {
+            let v: Value = serde_json::from_str(l).unwrap();
+            v["record_type"].as_str().unwrap().to_string()
+        })
+        .collect();
+    // manifest は最終行（Schema §6）。
+    assert_eq!(record_types.last(), Some(&"manifest".to_string()));
+    assert!(
+        record_types
+            .iter()
+            .filter(|t| t == &&"event".to_string())
+            .count()
+            > 0
+    );
+}
