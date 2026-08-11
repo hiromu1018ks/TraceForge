@@ -271,9 +271,9 @@
 
 ### 7.9 Parser 共通検証
 
-- [ ] T4-090 各 Parser の thread 数 1/複数一致 test（互換 §12-4）
-- [ ] T4-091 各 Parser の Provenance 到達 test（互換 §12-3）
-- [ ] T4-092 全 Parser fuzz target 作成（F-025）
+- [x] T4-090 各 Parser の thread 数 1/複数一致 test（互換 §12-4）
+- [x] T4-091 各 Parser の Provenance 到達 test（互換 §12-3）
+- [x] T4-092 全 Parser fuzz target 作成（F-025）
 
 ---
 
