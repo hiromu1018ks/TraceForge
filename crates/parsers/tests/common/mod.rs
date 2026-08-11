@@ -188,20 +188,30 @@ pub fn make_artifact(
     parser_id: &str,
     parser_version: &str,
 ) -> ArtifactInstance {
+    make_artifact_with_source(evidence, parser_id, parser_version, ArtifactSource::Lnk)
+}
+
+/// ArtifactSource を明示指定する版の [`make_artifact`]。
+pub fn make_artifact_with_source(
+    evidence: &EvidenceItem,
+    parser_id: &str,
+    parser_version: &str,
+    source: ArtifactSource,
+) -> ArtifactInstance {
     let artifact_id = id::artifact_id(
         &evidence.evidence_id,
-        ArtifactSource::Lnk.as_str(),
+        source.as_str(),
         parser_id,
         parser_version,
     );
     ArtifactInstance {
         artifact_id,
         evidence_id: evidence.evidence_id.clone(),
-        artifact_type: ArtifactSource::Lnk,
+        artifact_type: source,
         parser_id: parser_id.to_string(),
         parser_version: parser_version.to_string(),
         probe_result: ProbeResult::Confirmed,
-        detection_reasons: vec!["clsid".to_string()],
+        detection_reasons: vec!["fixture".to_string()],
         parse_status: ParseStatus::Complete,
     }
 }
@@ -224,5 +234,296 @@ pub fn dummy_evidence(snapshot_locator: &str, size: u64, sha256: &str) -> Eviden
         integrity_status: IntegrityStatus::VerifiedSnapshot,
         parse_eligible: true,
         snapshot_locator: snapshot_locator.to_string(),
+    }
+}
+
+// ============================================================
+// Prefetch fixture（合成・libyal PF format 準拠）
+// ============================================================
+
+/// Prefetch header 固定長（byte・全 version 共通）。
+pub const PF_HEADER_BYTES: usize = 84;
+
+/// 合成 Prefetch fixture の構築 option。
+#[derive(Clone, Debug)]
+pub struct PrefetchFixtureOptions {
+    /// Format version（17/23/26/30/31）。
+    pub version: u32,
+    /// Executable filename。
+    pub executable: String,
+    /// Prefetch hash。
+    pub prefetch_hash: u32,
+    /// Last run time（FILETIME）。v17/v23 は [0] のみ使用。v26+ は先頭8個。
+    pub last_run_filetimes: Vec<u64>,
+    /// Run count。
+    pub run_count: u32,
+    /// 参照 file/directory 一覧（filename strings へ生成）。
+    pub referenced_files: Vec<String>,
+    /// Volume device path（例: `\DEVICE\HARDDISKVOLUME1`）。None で volume 無し。
+    pub volume_device_path: Option<String>,
+    /// Volume serial number。
+    pub volume_serial: u32,
+}
+
+impl Default for PrefetchFixtureOptions {
+    fn default() -> Self {
+        PrefetchFixtureOptions {
+            version: 31,
+            executable: "NOTEPAD.EXE".to_string(),
+            prefetch_hash: 0x1234ABCD,
+            last_run_filetimes: vec![],
+            run_count: 0,
+            referenced_files: vec![],
+            volume_device_path: Some("\\DEVICE\\HARDDISKVOLUME1".to_string()),
+            volume_serial: 0xAABBCCDD,
+        }
+    }
+}
+
+/// version に応じた file information block の想定 size（byte）。
+fn pf_fileinfo_len(version: u32) -> usize {
+    match version {
+        17 => 68,
+        23 => 156,
+        26 | 30 | 31 => 220,
+        _ => 220,
+    }
+}
+
+/// version に応じた file metrics entry size。
+fn pf_metrics_entry_len(version: u32) -> usize {
+    match version {
+        17 => 20,
+        _ => 32,
+    }
+}
+
+/// version に応じた volume entry size。
+fn pf_volume_entry_len(version: u32) -> usize {
+    match version {
+        17 => 40,
+        23 | 26 => 104,
+        30 | 31 => 96,
+        _ => 96,
+    }
+}
+
+/// 合成 Prefetch bytes を構築する（libyal PF format 準拠・hand-crafted）。
+///
+/// 実 Windows 環境の生成物ではないため、fixture 管理方針へは
+/// 「合成（hand-crafted, libyal PF format 準拠）」として記録する。
+pub fn build_prefetch_fixture(opts: &PrefetchFixtureOptions) -> Vec<u8> {
+    let version = opts.version;
+    let fileinfo_len = pf_fileinfo_len(version);
+    let entry_len = pf_metrics_entry_len(version);
+    let vol_entry_len = pf_volume_entry_len(version);
+
+    // === filename strings block を構築（参照 file 一覧） ===
+    let mut strings_block: Vec<u8> = Vec::new();
+    let mut filename_offsets: Vec<u32> = Vec::with_capacity(opts.referenced_files.len());
+    for f in &opts.referenced_files {
+        filename_offsets.push(strings_block.len() as u32);
+        for u in f.encode_utf16() {
+            strings_block.extend_from_slice(&u.to_le_bytes());
+        }
+        strings_block.extend_from_slice(&0u16.to_le_bytes()); // null 終端
+    }
+    let filename_chars: Vec<u32> = opts
+        .referenced_files
+        .iter()
+        .map(|f| f.encode_utf16().count() as u32)
+        .collect();
+
+    // === volume device path 文字列 ===
+    let device_path_units: Vec<u16> = opts
+        .volume_device_path
+        .as_deref()
+        .map(|p| p.encode_utf16().collect())
+        .unwrap_or_default();
+    let device_path_bytes: Vec<u8> = device_path_units
+        .iter()
+        .flat_map(|u| u.to_le_bytes())
+        .collect();
+    let has_volume = opts.volume_device_path.is_some();
+
+    // === offset 計算 ===
+    let metrics_offset = (PF_HEADER_BYTES + fileinfo_len) as u32;
+    let metrics_block_len = (opts.referenced_files.len() * entry_len) as u32;
+    let filename_strings_offset = metrics_offset + metrics_block_len;
+    let filename_strings_size = strings_block.len() as u32;
+    let volumes_offset = filename_strings_offset + filename_strings_size;
+    let volumes_block_len = if has_volume {
+        (vol_entry_len + device_path_bytes.len()) as u32
+    } else {
+        0
+    };
+    let volumes_size = volumes_block_len;
+    let file_size = volumes_offset + volumes_block_len;
+
+    let mut buf: Vec<u8> = Vec::new();
+
+    // === header (84 byte) ===
+    buf.extend_from_slice(&version.to_le_bytes());
+    buf.extend_from_slice(b"SCCA");
+    buf.extend_from_slice(&0u32.to_le_bytes()); // unknown
+    buf.extend_from_slice(&file_size.to_le_bytes());
+    // executable filename (60 byte UTF-16LE)
+    let mut exec_buf = [0u8; 60];
+    for (i, u) in opts.executable.encode_utf16().take(29).enumerate() {
+        exec_buf[2 * i..2 * i + 2].copy_from_slice(&u.to_le_bytes());
+    }
+    buf.extend_from_slice(&exec_buf);
+    buf.extend_from_slice(&opts.prefetch_hash.to_le_bytes());
+    buf.extend_from_slice(&0u32.to_le_bytes()); // unknown flags
+    assert_eq!(buf.len(), PF_HEADER_BYTES);
+
+    // === file information block ===
+    let fi_start = buf.len();
+    buf.resize(buf.len() + fileinfo_len, 0);
+    let fi = &mut buf[fi_start..fi_start + fileinfo_len];
+    // 共通 field
+    fi[0..4].copy_from_slice(&metrics_offset.to_le_bytes());
+    fi[4..8].copy_from_slice(&(opts.referenced_files.len() as u32).to_le_bytes());
+    // trace chains offset = metrics_offset の直後ではなく、filename strings の後等。
+    // 本 fixture では trace chain は空でよいが、offset は妥当値へ。
+    fi[8..12].copy_from_slice(&filename_strings_offset.to_le_bytes()); // trace chains offset（参考）
+    fi[12..16].copy_from_slice(&0u32.to_le_bytes()); // trace chains count
+    fi[16..20].copy_from_slice(&filename_strings_offset.to_le_bytes());
+    fi[20..24].copy_from_slice(&filename_strings_size.to_le_bytes());
+    fi[24..28].copy_from_slice(&volumes_offset.to_le_bytes());
+    fi[28..32].copy_from_slice(&(if has_volume { 1u32 } else { 0u32 }).to_le_bytes());
+    fi[32..36].copy_from_slice(&volumes_size.to_le_bytes());
+    // last run time と run count は version 毎に offset が異なる。
+    match version {
+        17 => {
+            if let Some(&t) = opts.last_run_filetimes.first() {
+                fi[36..44].copy_from_slice(&t.to_le_bytes());
+            }
+            fi[60..64].copy_from_slice(&opts.run_count.to_le_bytes());
+        }
+        23 => {
+            if let Some(&t) = opts.last_run_filetimes.first() {
+                fi[44..52].copy_from_slice(&t.to_le_bytes());
+            }
+            fi[68..72].copy_from_slice(&opts.run_count.to_le_bytes());
+        }
+        _ => {
+            // v26/v30/v31: offset 44 に8個。
+            for (i, &t) in opts.last_run_filetimes.iter().take(8).enumerate() {
+                let o = 44 + i * 8;
+                fi[o..o + 8].copy_from_slice(&t.to_le_bytes());
+            }
+            fi[124..128].copy_from_slice(&opts.run_count.to_le_bytes());
+        }
+    }
+
+    // === file metrics array ===
+    for (i, _) in opts.referenced_files.iter().enumerate() {
+        let entry_start = buf.len();
+        buf.resize(buf.len() + entry_len, 0);
+        let e = &mut buf[entry_start..entry_start + entry_len];
+        let foff = filename_offsets[i];
+        let fchars = filename_chars[i];
+        if version == 17 {
+            // [0..4] trace chain idx, [4..8] trace count, [8..12] filename off, [12..16] chars, [16..20] flags
+            e[8..12].copy_from_slice(&foff.to_le_bytes());
+            e[12..16].copy_from_slice(&fchars.to_le_bytes());
+        } else {
+            // [12..16] filename off, [16..20] chars
+            e[12..16].copy_from_slice(&foff.to_le_bytes());
+            e[16..20].copy_from_slice(&fchars.to_le_bytes());
+        }
+    }
+
+    // === filename strings block ===
+    buf.extend_from_slice(&strings_block);
+
+    // === volumes information block ===
+    if has_volume {
+        let vol_entry_start = buf.len();
+        buf.resize(buf.len() + vol_entry_len, 0);
+        let ve = &mut buf[vol_entry_start..vol_entry_start + vol_entry_len];
+        let path_offset = vol_entry_len as u32; // entry の直後
+        let path_chars = device_path_units.len() as u32;
+        ve[0..4].copy_from_slice(&path_offset.to_le_bytes());
+        ve[4..8].copy_from_slice(&path_chars.to_le_bytes());
+        ve[8..16].copy_from_slice(
+            &(opts.last_run_filetimes.first().copied().unwrap_or(0)).to_le_bytes(),
+        );
+        ve[16..20].copy_from_slice(&opts.volume_serial.to_le_bytes());
+        // device path 文字列
+        buf.extend_from_slice(&device_path_bytes);
+    }
+
+    assert_eq!(buf.len() as u32, file_size, "file_size と実 size が一致");
+    buf
+}
+
+/// MAM 圧縮 Prefetch fixture を構築する（literal-only XPRESS Huffman）。
+///
+/// `uncompressed`（非圧縮 Prefetch bytes）を literal-only で圧縮し、MAM header で包む。
+/// 本圧縮器は test 用の literal-only 実装（match を使わない）。
+pub fn build_mam_prefetch_fixture(uncompressed: &[u8]) -> Vec<u8> {
+    let compressed = compress_literal_only_xpress_huffman(uncompressed);
+    let mut mam = Vec::with_capacity(8 + compressed.len());
+    mam.extend_from_slice(b"MAM\x04");
+    mam.extend_from_slice(&(uncompressed.len() as u32).to_le_bytes());
+    mam.extend_from_slice(&compressed);
+    mam
+}
+
+/// literal-only XPRESS Huffman 圧縮（test 用）。
+///
+/// 全256 literal へ code 長8を割り当て、各 byte を8 bit で符号化する。
+/// match symbol（256-511）は code 長0（不使用）。展開器の literal path と完全対応する。
+fn compress_literal_only_xpress_huffman(input: &[u8]) -> Vec<u8> {
+    let mut writer = XpressBitWriter::new();
+    // 表（256 byte = 512 nibble）: symbol 0-255 は長さ8、256-511 は長さ0。
+    for _ in 0..128 {
+        writer.write_bits(4, 8);
+        writer.write_bits(4, 8);
+    }
+    for _ in 0..128 {
+        writer.write_bits(4, 0);
+        writer.write_bits(4, 0);
+    }
+    for &b in input {
+        writer.write_bits(8, b as u32);
+    }
+    writer.finish()
+}
+
+/// MSB-first で 16-bit LE word へ bit を詰める writer。
+struct XpressBitWriter {
+    out: Vec<u8>,
+    word: u16,
+    bit_pos: u8,
+}
+
+impl XpressBitWriter {
+    fn new() -> Self {
+        XpressBitWriter {
+            out: Vec::new(),
+            word: 0,
+            bit_pos: 0,
+        }
+    }
+    fn write_bits(&mut self, n: u8, value: u32) {
+        for i in (0..n).rev() {
+            let bit = (value >> i) & 1;
+            self.word |= (bit as u16) << (15 - self.bit_pos);
+            self.bit_pos += 1;
+            if self.bit_pos == 16 {
+                self.out.extend_from_slice(&self.word.to_le_bytes());
+                self.word = 0;
+                self.bit_pos = 0;
+            }
+        }
+    }
+    fn finish(mut self) -> Vec<u8> {
+        if self.bit_pos > 0 {
+            self.out.extend_from_slice(&self.word.to_le_bytes());
+        }
+        self.out
     }
 }

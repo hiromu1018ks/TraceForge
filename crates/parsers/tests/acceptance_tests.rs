@@ -10,6 +10,9 @@
 //!
 //! 併せて互換 §12 の acceptance 条件（正常 fixture・truncated 耐性・Provenance 到達・
 //! SHA-256 記録・外部仕様 revision 記録・非対応要素の記録・Event type 断定禁止）を検証する。
+//!
+//! 後半に Prefetch（T4-025）の互換 §12 acceptance を併載する。両 Parser で
+//! 同一の acceptance 基準を満たすことを個別に検証する。
 
 mod common;
 
@@ -473,4 +476,379 @@ fn lnk_event_attributes_are_btremap_deterministic() {
         sorted_keys.sort();
         assert_eq!(keys, sorted_keys, "attribute key は byte 順");
     }
+}
+
+// ============================================================
+// Prefetch acceptance test（T4-025、互換 §12・§4.1）
+// ============================================================
+
+use tf_parsers::prefetch::{
+    PARSER_ID as PF_PARSER_ID, PARSER_VERSION as PF_PARSER_VERSION,
+    PREFETCH_EXECUTION_OBSERVED_EVENT_TYPE as PF_EVENT_TYPE, PREFETCH_REFERENCE, PrefetchParser,
+    UNSUPPORTED_VERSION_CODE as PF_UNSUPPORTED_VERSION_CODE,
+};
+
+/// Prefetch fixture を構築して EventStore へ流し込む共通 helper。
+fn run_prefetch_parser(
+    bytes: &[u8],
+    dir: &std::path::Path,
+) -> (
+    tf_parsers::ParseSummary,
+    Vec<tf_core::issue::Issue>,
+    EventStore,
+) {
+    let (evidence, _) = common::make_snapshot("accept.pf", bytes, dir);
+    let artifact = common::make_artifact_with_source(
+        &evidence,
+        PF_PARSER_ID,
+        PF_PARSER_VERSION,
+        tf_core::event::ArtifactSource::Prefetch,
+    );
+    let context = ParseContext {
+        evidence: evidence.clone(),
+        artifact,
+    };
+    let spool = dir.join("pf_accept.spool");
+    let mut store = EventStore::create(&spool).unwrap();
+    let mut issues: Vec<tf_core::issue::Issue> = Vec::new();
+    let snapshot_path = std::path::Path::new(&context.evidence.snapshot_locator);
+    let mut file = std::fs::File::open(snapshot_path).unwrap();
+    let parser = PrefetchParser::new();
+    {
+        let mut sink = EventStoreSink::new(&mut store, &mut issues);
+        let summary = parser.parse(&mut file, &context, &mut sink);
+        (summary, issues, store)
+    }
+}
+
+/// 標準的な Prefetch fixture（v31・run time 3個・参照 file 2件）。
+fn standard_prefetch_fixture() -> common::PrefetchFixtureOptions {
+    common::PrefetchFixtureOptions {
+        version: 31,
+        last_run_filetimes: vec![
+            common::filetime_from_unix_offset(0),
+            common::filetime_from_unix_offset(60),
+            common::filetime_from_unix_offset(120),
+        ],
+        run_count: 3,
+        referenced_files: vec![
+            "\\DEVICE\\HARDDISKVOLUME1\\WINDOWS\\SYSTEM32\\NTDLL.DLL".to_string(),
+            "\\DEVICE\\HARDDISKVOLUME1\\WINDOWS\\SYSTEM32\\KERNELBASE.DLL".to_string(),
+        ],
+        ..Default::default()
+    }
+}
+
+/// 互換 §12-1（Prefetch 版）: 正常 fixture から期待 Event を生成する。
+#[test]
+fn pf_acceptance_12_1_valid_fixture_emits_expected_events() {
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = common::build_prefetch_fixture(&standard_prefetch_fixture());
+    let (summary, issues, store) = run_prefetch_parser(&bytes, dir.path());
+
+    assert_eq!(summary.status, tf_core::case::ParseStatus::Complete);
+    assert_eq!(store.len(), 3, "run time 3個 → 3 event");
+    assert!(issues.is_empty());
+    for result in store.iter().unwrap() {
+        let event = result.unwrap();
+        assert_eq!(event.event_type.as_str(), PF_EVENT_TYPE);
+        assert_eq!(event.source, tf_core::event::ArtifactSource::Prefetch);
+    }
+}
+
+/// 互換 §12-2（Prefetch 版）: truncated・invalid length・unknown version で panic しない。
+#[test]
+fn pf_acceptance_12_2_corrupt_inputs_do_not_panic() {
+    // 各入力で独立した tempdir を使い、snapshot file 名の衝突を避ける。
+    let run = |bytes: &[u8]| {
+        let dir = tempfile::tempdir().unwrap();
+        let _ = run_prefetch_parser(bytes, dir.path());
+    };
+
+    // truncated: header すら無い。
+    let short: Vec<u8> = (0..10).collect();
+    run(&short);
+
+    // truncated: file info が途中で切れている。
+    let mut truncated = common::build_prefetch_fixture(&standard_prefetch_fixture());
+    truncated.truncate(common::PF_HEADER_BYTES + 40);
+    run(&truncated);
+
+    // invalid: signature を壊す。
+    let mut bad_sig = common::build_prefetch_fixture(&standard_prefetch_fixture());
+    bad_sig[4..8].copy_from_slice(b"XXXX");
+    run(&bad_sig);
+
+    // unknown version。
+    let mut unk = common::build_prefetch_fixture(&standard_prefetch_fixture());
+    unk[0..4].copy_from_slice(&99u32.to_le_bytes());
+    let dir = tempfile::tempdir().unwrap();
+    let (summary, issues, _store) = run_prefetch_parser(&unk, dir.path());
+    assert_eq!(summary.status, tf_core::case::ParseStatus::Skipped);
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.issue_id == PF_UNSUPPORTED_VERSION_CODE)
+    );
+}
+
+/// 互換 §12-3（Prefetch 版）: Provenance が元 record へ到達する。
+#[test]
+fn pf_acceptance_12_3_provenance_reaches_original_record() {
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = common::build_prefetch_fixture(&standard_prefetch_fixture());
+    let (_summary, _issues, store) = run_prefetch_parser(&bytes, dir.path());
+
+    for result in store.iter().unwrap() {
+        let event = result.unwrap();
+        let prov = &event.provenance;
+        assert_eq!(prov.parser_id, PF_PARSER_ID);
+        assert_eq!(prov.parser_version, PF_PARSER_VERSION);
+        // record_locator は ByteRange（run time の FILETIME 位置）。
+        assert!(matches!(
+            prov.record_locator,
+            RecordLocator::ByteRange { .. }
+        ));
+    }
+}
+
+/// 互換 §12-4（Prefetch 版）: 1 thread と複数 thread で出力が一致する（Parser 単体の決定性）。
+#[test]
+fn pf_acceptance_12_4_parser_is_deterministic_across_runs() {
+    let bytes = common::build_prefetch_fixture(&standard_prefetch_fixture());
+
+    let run_once = || -> Vec<String> {
+        let dir = tempfile::tempdir().unwrap();
+        let (_summary, _issues, store) = run_prefetch_parser(&bytes, dir.path());
+        let mut ids: Vec<String> = store.iter().unwrap().map(|r| r.unwrap().id).collect();
+        ids.sort();
+        ids
+    };
+
+    let ids1 = run_once();
+    let ids2 = run_once();
+    assert_eq!(ids1, ids2, "同一入力なら同一 Event ID（決定性）");
+}
+
+/// 互換 §12-5（Prefetch 版）: fixture SHA-256・生成方法を記録できる。
+#[test]
+fn pf_acceptance_12_5_fixture_metadata_recorded() {
+    let bytes = common::build_prefetch_fixture(&standard_prefetch_fixture());
+    let sha256 = common::sha256_hex(&bytes);
+    assert_eq!(sha256.len(), 64);
+    assert!(
+        sha256
+            .chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+    );
+    // 生成方法: 合成（hand-crafted, libyal PF format 準拠）。docs/learn/phase4b.md へ記録。
+}
+
+/// 互換 §12-6（Prefetch 版）: 外部仕様 revision / dependency version を記録する。
+#[test]
+fn pf_acceptance_12_6_reference_spec_revision_recorded() {
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = common::build_prefetch_fixture(&standard_prefetch_fixture());
+    let (_summary, _issues, store) = run_prefetch_parser(&bytes, dir.path());
+
+    for result in store.iter().unwrap() {
+        let event = result.unwrap();
+        assert_eq!(
+            event.attributes["prefetch.reference_spec"],
+            PREFETCH_REFERENCE
+        );
+        assert_eq!(
+            event.attributes["prefetch.parser_version"],
+            PF_PARSER_VERSION
+        );
+    }
+}
+
+/// 互換 §12-7（Prefetch 版）: 非対応 field・構文・version を黙って無視しない。
+#[test]
+fn pf_acceptance_12_7_unsupported_version_emits_issue() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut bytes = common::build_prefetch_fixture(&standard_prefetch_fixture());
+    bytes[0..4].copy_from_slice(&99u32.to_le_bytes());
+    let (summary, issues, _store) = run_prefetch_parser(&bytes, dir.path());
+
+    assert_eq!(summary.status, tf_core::case::ParseStatus::Skipped);
+    // 黙って無視せず Issue へ記録する。
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.issue_id == PF_UNSUPPORTED_VERSION_CODE)
+    );
+    // message に未対応 version 番号が含まれる（黙殺ではない）。
+    let msg = &issues
+        .iter()
+        .find(|i| i.issue_id == PF_UNSUPPORTED_VERSION_CODE)
+        .unwrap()
+        .message;
+    assert!(msg.contains("99"), "未対応 version 番号が message へ残る");
+}
+
+/// 互換 §12-8（Prefetch 版）: 形式の意味を越えて Event type を断定しない。
+#[test]
+fn pf_acceptance_12_8_event_type_does_not_overstate_observation() {
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = common::build_prefetch_fixture(&standard_prefetch_fixture());
+    let (_summary, _issues, store) = run_prefetch_parser(&bytes, dir.path());
+
+    for result in store.iter().unwrap() {
+        let event = result.unwrap();
+        // event_type は prefetch_execution_observed（観測型）。
+        assert_eq!(event.event_type.as_str(), PF_EVENT_TYPE);
+        // assertion は Observed（規範 §7.1）。
+        assert_eq!(event.assertion, tf_core::event::AssertionKind::Observed);
+        // 「実行した」「起動した」等の断定型ではない。
+        let et = event.event_type.as_str();
+        assert!(!et.contains("process_start"));
+        assert!(!et.contains("started"));
+        assert!(!et.contains("launched"));
+    }
+}
+
+/// MAM 圧縮 Prefetch（互換 §4.1 Required）: 展開後 bytes を別 Evidence と誤認しない。
+#[test]
+fn pf_acceptance_mam_decompression_preserves_provenance_chain() {
+    let dir = tempfile::tempdir().unwrap();
+    let uncompressed = common::build_prefetch_fixture(&standard_prefetch_fixture());
+    let mam = common::build_mam_prefetch_fixture(&uncompressed);
+    let (evidence, _) = common::make_snapshot("mam.pf", &mam, dir.path());
+    let artifact = common::make_artifact_with_source(
+        &evidence,
+        PF_PARSER_ID,
+        PF_PARSER_VERSION,
+        tf_core::event::ArtifactSource::Prefetch,
+    );
+    let context = ParseContext {
+        evidence: evidence.clone(),
+        artifact,
+    };
+    let spool = dir.path().join("pf_mam.spool");
+    let mut store = EventStore::create(&spool).unwrap();
+    let mut issues: Vec<tf_core::issue::Issue> = Vec::new();
+    let snapshot_path = std::path::Path::new(&context.evidence.snapshot_locator);
+    let mut file = std::fs::File::open(snapshot_path).unwrap();
+    {
+        let mut sink = EventStoreSink::new(&mut store, &mut issues);
+        let summary = PrefetchParser::new().parse(&mut file, &context, &mut sink);
+        assert_eq!(summary.status, tf_core::case::ParseStatus::Complete);
+    }
+    assert_eq!(store.len(), 3);
+    assert!(issues.is_empty());
+
+    // 展開後 bytes が別 Evidence になっていない: Provenance は元 Evidence を指す。
+    for result in store.iter().unwrap() {
+        let event = result.unwrap();
+        assert_eq!(event.provenance.evidence_id, evidence.evidence_id);
+        assert_eq!(event.attributes["prefetch.mam_compressed"], true);
+        assert_eq!(event.attributes["prefetch.format_version"], 31);
+    }
+}
+
+/// Prefetch の縦割り: Prefetch のみで analyze → Case JSONL + Manifest が生成される。
+#[test]
+fn pf_vertical_slice_prefetch_to_case_jsonl() {
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = common::build_prefetch_fixture(&standard_prefetch_fixture());
+    let (evidence, _) = common::make_snapshot("vslice.pf", &bytes, dir.path());
+    let artifact = common::make_artifact_with_source(
+        &evidence,
+        PF_PARSER_ID,
+        PF_PARSER_VERSION,
+        tf_core::event::ArtifactSource::Prefetch,
+    );
+
+    let spool_path = dir.path().join("case.spool");
+    let mut store = EventStore::create(&spool_path).unwrap();
+    let mut issues: Vec<tf_core::issue::Issue> = Vec::new();
+    let context = ParseContext {
+        evidence: evidence.clone(),
+        artifact: artifact.clone(),
+    };
+    let snapshot_path = std::path::Path::new(&context.evidence.snapshot_locator);
+    let mut file = std::fs::File::open(snapshot_path).unwrap();
+    {
+        let mut sink = EventStoreSink::new(&mut store, &mut issues);
+        PrefetchParser::new().parse(&mut file, &context, &mut sink);
+    }
+    store.commit().unwrap();
+
+    // 最小 JSONL 出力（M2 と同じ経路）。
+    let case_id = tf_core::id::case_id(&[evidence.evidence_id.as_str()]);
+    let case = CaseMetadata {
+        case_id: case_id.clone(),
+        external_case_id: None,
+        name: "Prefetch vertical slice".to_string(),
+        analyst: None,
+        description: None,
+        default_timezone: None,
+        tags: vec![],
+    };
+    let other_counts = OtherCounts {
+        evidence: 1,
+        artifact: 1,
+        issue: 0,
+        match_: 0,
+        finding: 0,
+    };
+    let manifest_counts = build_manifest_counts(&store, &other_counts);
+    let manifest = Manifest {
+        traceforge_version: "0.1.0".to_string(),
+        build_commit: "test".to_string(),
+        target: "test".to_string(),
+        schema_version: SCHEMA_VERSION.to_string(),
+        compatibility_profile: "TF-WIN-1.0".to_string(),
+        run_started_at: "2026-08-11T01:00:00Z".to_string(),
+        run_finished_at: "2026-08-11T01:00:01Z".to_string(),
+        resolved_config: serde_json::json!({}),
+        resolved_config_sha256: "b".repeat(64),
+        case_id: case_id.clone(),
+        counts: manifest_counts,
+        components: vec![serde_json::json!({
+            "parser_id": PF_PARSER_ID,
+            "parser_version": PF_PARSER_VERSION,
+            "reference": PREFETCH_REFERENCE,
+        })],
+        rules: vec![],
+        attack_dataset: None,
+        timezone_assumptions: vec![],
+        limits: serde_json::json!({}),
+        incomplete_reasons: vec![],
+        complete: true,
+        exit_code: 0,
+    };
+    let stream = CaseStream {
+        case: &case,
+        evidence: std::slice::from_ref(&evidence),
+        artifacts: std::slice::from_ref(&artifact),
+        issues: &issues,
+        matches: &[],
+        findings: &[],
+        manifest: &manifest,
+    };
+
+    let mut output: Vec<u8> = Vec::new();
+    let outcome = write_jsonl(&store, &stream, 1024 * 1024, None, &mut output).unwrap();
+    assert_eq!(outcome.events_output, 3);
+
+    let output_str = String::from_utf8(output).unwrap();
+    let record_types: Vec<String> = output_str
+        .lines()
+        .map(|l| {
+            let v: Value = serde_json::from_str(l).unwrap();
+            v["record_type"].as_str().unwrap().to_string()
+        })
+        .collect();
+    // manifest は最終行（Schema §6）。
+    assert_eq!(record_types.last(), Some(&"manifest".to_string()));
+    assert!(
+        record_types
+            .iter()
+            .filter(|t| t == &&"event".to_string())
+            .count()
+            == 3
+    );
 }

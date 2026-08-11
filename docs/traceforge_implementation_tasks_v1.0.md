@@ -215,12 +215,12 @@
 
 ### 7.3 Prefetch Parser
 
-- [ ] T4-020 format version 検出（17/23/26/30/31、互換 §4.1）
-- [ ] T4-021 executable 名・run count・run time・volume・参照 file/directory 取得（互換 §4.1・§5）
-- [ ] T4-022 MAM 圧縮展開（同一 Provenance chain、互換 §4.1）
-- [ ] T4-023 未知 version skip + `TF-W-PREFETCH-UNSUPPORTED-VERSION`（互換 §4.1）
-- [ ] T4-024 実行痕跡 Event 化（process start へ断定しない、互換 §4.1）
-- [ ] T4-025 Prefetch fixture + acceptance test（各 version 正常 2件以上、MAM、異常系、互換 §4.1）
+- [x] T4-020 format version 検出（17/23/26/30/31、互換 §4.1）
+- [x] T4-021 executable 名・run count・run time・volume・参照 file/directory 取得（互換 §4.1・§5）
+- [x] T4-022 MAM 圧縮展開（同一 Provenance chain、互換 §4.1）
+- [x] T4-023 未知 version skip + `TF-W-PREFETCH-UNSUPPORTED-VERSION`（互換 §4.1）
+- [x] T4-024 実行痕跡 Event 化（process start へ断定しない、互換 §4.1）
+- [x] T4-025 Prefetch fixture + acceptance test（各 version 正常 2件以上、MAM、異常系、互換 §4.1）
 
 ### 7.4 USN Journal Parser
 
