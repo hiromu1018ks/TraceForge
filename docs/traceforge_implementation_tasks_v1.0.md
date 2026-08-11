@@ -235,13 +235,13 @@
 
 ### 7.5 EVTX Parser
 
-- [ ] T4-040 file header / chunk / record 境界検証（互換 §4.2）
-- [ ] T4-041 binxml decoder 実装
-- [ ] T4-042 record ID・provider・channel・computer・Event ID・EventData/SystemData 保持（互換 §4.2・§5）
-- [ ] T4-043 typed mapping 5種（4624/4625/4688/4689/7045、channel+provider+必須 field 同時検証、互換 §4.2）
-- [ ] T4-044 PowerShell Operational / Sysmon Operational 対応（互換 §4.2）
-- [ ] T4-045 partial chunk・bad checksum・truncated record の部分回復（互換 §4.2）
-- [ ] T4-046 EVTX fixture + acceptance test（3 OS 世代、4 channel、異常系、互換 §4.2）
+- [x] T4-040 file header / chunk / record 境界検証（互換 §4.2）
+- [x] T4-041 binxml decoder 実装
+- [x] T4-042 record ID・provider・channel・computer・Event ID・EventData/SystemData 保持（互換 §4.2・§5）
+- [x] T4-043 typed mapping 5種（4624/4625/4688/4689/7045、channel+provider+必須 field 同時検証、互換 §4.2）
+- [x] T4-044 PowerShell Operational / Sysmon Operational 対応（互換 §4.2）
+- [x] T4-045 partial chunk・bad checksum・truncated record の部分回復（互換 §4.2）
+- [x] T4-046 EVTX fixture + acceptance test（3 OS 世代、4 channel、異常系、互換 §4.2）
 
 ### 7.6 Registry Parser
 

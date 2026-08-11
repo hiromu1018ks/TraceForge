@@ -662,3 +662,208 @@ pub mod usn_reason {
 pub fn usn_filetime_from_unix_offset(offset_seconds: i64) -> u64 {
     filetime_from_unix_offset(offset_seconds)
 }
+
+// ============================================================
+// EVTX fixture（合成・libyal libevtx 仕様準拠）
+// ============================================================
+
+pub use tf_parsers::evtx::binxml::{
+    BinXmlBuilder, EventContentSpec, EventDataEntry, ValueKind, ev_data,
+};
+pub use tf_parsers::evtx::chunk::{
+    CHUNK_BYTES as EVTX_CHUNK_BYTES, CHUNK_MAGIC as EVTX_CHUNK_MAGIC,
+};
+pub use tf_parsers::evtx::header::{EVTX_FILE_MAGIC, FILE_HEADER_BYTES as EVTX_FILE_HEADER_BYTES};
+pub use tf_parsers::evtx::record::RECORD_MAGIC as EVTX_RECORD_MAGIC;
+
+/// EVTX file header を構築する。chunk_count 個の chunk が続く前提。
+pub fn build_evtx_file_header(chunk_count: u16) -> Vec<u8> {
+    use tf_parsers::evtx::crc32::crc32_sequential;
+    use tf_parsers::evtx::header::{EVTX_MAJOR_VERSION, EVTX_MINOR_VERSION};
+    let mut buf = vec![0u8; EVTX_FILE_HEADER_BYTES];
+    buf[0..8].copy_from_slice(&EVTX_FILE_MAGIC);
+    buf[8..16].copy_from_slice(&0u64.to_le_bytes()); // first chunk
+    buf[16..24].copy_from_slice(&(chunk_count as u64).to_le_bytes()); // last chunk
+    buf[24..32].copy_from_slice(&0u64.to_le_bytes());
+    buf[32..36].copy_from_slice(&128u32.to_le_bytes());
+    buf[36..38].copy_from_slice(&EVTX_MINOR_VERSION.to_le_bytes());
+    buf[38..40].copy_from_slice(&EVTX_MAJOR_VERSION.to_le_bytes());
+    buf[40..42].copy_from_slice(&(EVTX_FILE_HEADER_BYTES as u16).to_le_bytes());
+    buf[44..46].copy_from_slice(&chunk_count.to_le_bytes());
+    let cksum = crc32_sequential(&buf[0..120], &buf[128..EVTX_FILE_HEADER_BYTES]);
+    buf[124..128].copy_from_slice(&cksum.to_le_bytes());
+    buf
+}
+
+/// 1件の EVTX record bytes を構築する。
+pub fn build_evtx_record(record_id: u64, timestamp_ft: u64, spec: &EventContentSpec) -> Vec<u8> {
+    let mut builder = BinXmlBuilder::new();
+    builder.start_event(spec);
+    let binxml = builder.finish();
+    let size = 4 + 8 + 8 + binxml.len() + 4;
+    let mut buf = Vec::with_capacity(2 + size);
+    buf.extend_from_slice(&EVTX_RECORD_MAGIC);
+    buf.extend_from_slice(&(size as i32).to_le_bytes());
+    buf.extend_from_slice(&record_id.to_le_bytes());
+    buf.extend_from_slice(&timestamp_ft.to_le_bytes());
+    buf.extend_from_slice(&binxml);
+    buf.extend_from_slice(&(size as i32).to_le_bytes());
+    buf
+}
+
+/// 1 chunk bytes を構築する。records は可変長で、free_space_offset は自動計算。
+pub fn build_evtx_chunk(records: &[Vec<u8>]) -> Vec<u8> {
+    let mut buf = vec![0u8; EVTX_CHUNK_BYTES];
+    buf[0..8].copy_from_slice(&EVTX_CHUNK_MAGIC);
+    buf[40..44].copy_from_slice(&512u32.to_le_bytes());
+    let records_total: usize = records.iter().map(|r| r.len()).sum();
+    let free_space_offset = 512 + records_total;
+    buf[48..52].copy_from_slice(&(free_space_offset as u32).to_le_bytes());
+    let mut records_region = Vec::new();
+    for r in records {
+        records_region.extend_from_slice(r);
+    }
+    buf[512..512 + records_region.len()].copy_from_slice(&records_region);
+    let records_crc = tf_parsers::evtx::crc32::crc32(&buf[512..free_space_offset]);
+    buf[52..56].copy_from_slice(&records_crc.to_le_bytes());
+    buf
+}
+
+/// file 全体（header + chunks）を構築する。
+pub fn build_evtx_file(records_per_chunk: &[Vec<Vec<u8>>]) -> Vec<u8> {
+    let mut file = build_evtx_file_header(records_per_chunk.len() as u16);
+    for chunk_records in records_per_chunk {
+        let chunk = build_evtx_chunk(chunk_records);
+        file.extend_from_slice(&chunk);
+    }
+    file
+}
+
+/// Security 4624 login event の spec（test 用の代表値）。
+pub fn login_4624_spec(computer: &str) -> EventContentSpec {
+    EventContentSpec {
+        provider_name: "Microsoft-Windows-Security-Auditing".to_string(),
+        provider_guid: None,
+        event_id: 4624,
+        version: Some(0),
+        level: Some(0),
+        channel: "Security".to_string(),
+        computer: computer.to_string(),
+        event_data: vec![
+            ev_data("TargetUserName", "alice"),
+            ev_data("LogonType", "3"),
+        ],
+    }
+}
+
+/// Security 4625 login_failure event の spec。
+pub fn login_4625_spec(computer: &str) -> EventContentSpec {
+    EventContentSpec {
+        provider_name: "Microsoft-Windows-Security-Auditing".to_string(),
+        provider_guid: None,
+        event_id: 4625,
+        version: Some(0),
+        level: Some(0),
+        channel: "Security".to_string(),
+        computer: computer.to_string(),
+        event_data: vec![
+            ev_data("TargetUserName", "attacker"),
+            ev_data("LogonType", "10"),
+        ],
+    }
+}
+
+/// Security 4688 process_start event の spec。
+pub fn process_start_4688_spec(computer: &str) -> EventContentSpec {
+    EventContentSpec {
+        provider_name: "Microsoft-Windows-Security-Auditing".to_string(),
+        provider_guid: None,
+        event_id: 4688,
+        version: Some(0),
+        level: Some(0),
+        channel: "Security".to_string(),
+        computer: computer.to_string(),
+        event_data: vec![
+            ev_data("NewProcessName", "C:\\Windows\\System32\\cmd.exe"),
+            ev_data("CommandLine", "/c calc.exe"),
+        ],
+    }
+}
+
+/// Security 4689 process_stop event の spec。
+pub fn process_stop_4689_spec(computer: &str) -> EventContentSpec {
+    EventContentSpec {
+        provider_name: "Microsoft-Windows-Security-Auditing".to_string(),
+        provider_guid: None,
+        event_id: 4689,
+        version: Some(0),
+        level: Some(0),
+        channel: "Security".to_string(),
+        computer: computer.to_string(),
+        event_data: vec![ev_data("ProcessName", "C:\\Windows\\System32\\cmd.exe")],
+    }
+}
+
+/// System 7045 service_create event の spec。
+pub fn service_create_7045_spec(computer: &str) -> EventContentSpec {
+    EventContentSpec {
+        provider_name: "Service Control Manager".to_string(),
+        provider_guid: None,
+        event_id: 7045,
+        version: None,
+        level: None,
+        channel: "System".to_string(),
+        computer: computer.to_string(),
+        event_data: vec![
+            EventDataEntry {
+                name: "ServiceName".into(),
+                value: "MaliciousSvc".into(),
+                kind: ValueKind::String,
+            },
+            EventDataEntry {
+                name: "ImagePath".into(),
+                value: "C:\\Users\\Public\\svc.exe".into(),
+                kind: ValueKind::String,
+            },
+        ],
+    }
+}
+
+/// PowerShell Operational channel の event spec（T4-044: typed mapping しない）。
+pub fn powershell_operational_spec(computer: &str) -> EventContentSpec {
+    EventContentSpec {
+        provider_name: "Microsoft-Windows-PowerShell".to_string(),
+        provider_guid: None,
+        event_id: 4103,
+        version: None,
+        level: None,
+        channel: "Microsoft-Windows-PowerShell/Operational".to_string(),
+        computer: computer.to_string(),
+        event_data: vec![
+            ev_data("ContextInfo", "powershell context"),
+            ev_data("Payload", "command data"),
+        ],
+    }
+}
+
+/// Sysmon Operational channel の event spec（T4-044: typed mapping しない）。
+pub fn sysmon_operational_spec(computer: &str) -> EventContentSpec {
+    EventContentSpec {
+        provider_name: "Microsoft-Windows-Sysmon".to_string(),
+        provider_guid: None,
+        event_id: 1,
+        version: None,
+        level: None,
+        channel: "Microsoft-Windows-Sysmon/Operational".to_string(),
+        computer: computer.to_string(),
+        event_data: vec![
+            ev_data("Image", "C:\\Users\\alice\\tool.exe"),
+            ev_data("CommandLine", "tool.exe -arg"),
+        ],
+    }
+}
+
+/// EVTX filetime helper: 2026-08-10T01:15:20Z + offset_seconds を FILETIME へ。
+pub fn evtx_filetime_from_unix_offset(offset_seconds: i64) -> u64 {
+    filetime_from_unix_offset(offset_seconds)
+}

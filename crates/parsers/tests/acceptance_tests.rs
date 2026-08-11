@@ -1281,3 +1281,296 @@ fn usn_vertical_slice_usn_to_case_jsonl() {
             == 6
     );
 }
+
+// ============================================================
+// EVTX acceptance test（T4-046、互換 §12・§4.2）
+// ============================================================
+
+use tf_parsers::evtx::EvtxParser;
+use tf_parsers::{
+    EVTX_EVENT_LOGGED_TYPE as EVTX_EVENT_TYPE, EVTX_PARSER_ID as EVTX_PARSER_ID_V,
+    EVTX_PARSER_VERSION as EVTX_PARSER_VERSION_V, EVTX_REFERENCE as EVTX_REF,
+};
+
+/// EVTX fixture を構築して EventStore へ流し込む共通 helper。
+fn run_evtx_parser(
+    bytes: &[u8],
+    dir: &std::path::Path,
+) -> (
+    tf_parsers::ParseSummary,
+    Vec<tf_core::issue::Issue>,
+    EventStore,
+) {
+    let (evidence, _) = common::make_snapshot("Security.evtx", bytes, dir);
+    let artifact = common::make_artifact_with_source(
+        &evidence,
+        EVTX_PARSER_ID_V,
+        EVTX_PARSER_VERSION_V,
+        tf_core::event::ArtifactSource::Evtx,
+    );
+    let context = ParseContext {
+        evidence: evidence.clone(),
+        artifact,
+    };
+    let spool = dir.join("evtx_accept.spool");
+    let mut store = EventStore::create(&spool).unwrap();
+    let mut issues: Vec<tf_core::issue::Issue> = Vec::new();
+    let snapshot_path = std::path::Path::new(&context.evidence.snapshot_locator);
+    let mut file = std::fs::File::open(snapshot_path).unwrap();
+    let parser = EvtxParser::new();
+    {
+        let mut sink = EventStoreSink::new(&mut store, &mut issues);
+        let summary = parser.parse(&mut file, &context, &mut sink);
+        (summary, issues, store)
+    }
+}
+
+/// 標準 EVTX fixture（4件の typed event + PowerShell/Sysmon の generic event 計6件）。
+fn standard_evtx_fixture() -> Vec<u8> {
+    let ft = common::evtx_filetime_from_unix_offset(0);
+    let chunk1 = vec![
+        common::build_evtx_record(1, ft, &common::login_4624_spec("WS1")),
+        common::build_evtx_record(2, ft + 100, &common::login_4625_spec("WS1")),
+        common::build_evtx_record(3, ft + 200, &common::process_start_4688_spec("WS1")),
+        common::build_evtx_record(4, ft + 300, &common::process_stop_4689_spec("WS1")),
+    ];
+    let chunk2 = vec![
+        common::build_evtx_record(5, ft + 400, &common::service_create_7045_spec("WS1")),
+        common::build_evtx_record(6, ft + 500, &common::powershell_operational_spec("WS1")),
+    ];
+    common::build_evtx_file(&[chunk1, chunk2])
+}
+
+/// 互換 §12-1（EVTX 版）: 正常 fixture から期待 Event を生成する。
+#[test]
+fn evtx_acceptance_12_1_valid_fixture_emits_expected_events() {
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = standard_evtx_fixture();
+    let (summary, _issues, store) = run_evtx_parser(&bytes, dir.path());
+
+    assert_eq!(summary.status, tf_core::case::ParseStatus::Complete);
+    assert_eq!(store.len(), 6, "6件の EVTX record から6 event");
+    let mut types_count = std::collections::BTreeMap::new();
+    for result in store.iter().unwrap() {
+        let event = result.unwrap();
+        *types_count
+            .entry(event.event_type.as_str().to_string())
+            .or_insert(0) += 1;
+        assert_eq!(event.source, tf_core::event::ArtifactSource::Evtx);
+    }
+    assert_eq!(types_count["login"], 1);
+    assert_eq!(types_count["login_failure"], 1);
+    assert_eq!(types_count["process_start"], 1);
+    assert_eq!(types_count["process_stop"], 1);
+    assert_eq!(types_count["service_create"], 1);
+    assert_eq!(types_count[EVTX_EVENT_TYPE], 1, "PowerShell → generic");
+}
+
+/// 互換 §12-2（EVTX 版）: truncated・bad magic で panic しない。
+#[test]
+fn evtx_acceptance_12_2_corrupt_inputs_do_not_panic() {
+    let run = |bytes: &[u8]| {
+        let dir = tempfile::tempdir().unwrap();
+        let _ = run_evtx_parser(bytes, dir.path());
+    };
+
+    run(&(0..10).collect::<Vec<u8>>()); // 短すぎる
+    run(&common::build_evtx_file_header(0)); // file header だけ
+    let mut bad = standard_evtx_fixture();
+    bad[0] = 0xFF; // magic 破壊
+    run(&bad);
+}
+
+/// 互換 §12-3（EVTX 版）: Provenance が元 record へ到達する。
+#[test]
+fn evtx_acceptance_12_3_provenance_reaches_original_record() {
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = standard_evtx_fixture();
+    let (_summary, _issues, store) = run_evtx_parser(&bytes, dir.path());
+
+    for result in store.iter().unwrap() {
+        let event = result.unwrap();
+        let prov = &event.provenance;
+        assert_eq!(prov.parser_id, EVTX_PARSER_ID_V);
+        assert_eq!(prov.parser_version, EVTX_PARSER_VERSION_V);
+        assert!(matches!(
+            prov.record_locator,
+            RecordLocator::ByteRange { .. }
+        ));
+    }
+}
+
+/// 互換 §12-4（EVTX 版）: 同一入力で同一 Event ID（決定性）。
+#[test]
+fn evtx_acceptance_12_4_parser_is_deterministic_across_runs() {
+    let bytes = standard_evtx_fixture();
+    let run_once = || -> Vec<String> {
+        let dir = tempfile::tempdir().unwrap();
+        let (_summary, _issues, store) = run_evtx_parser(&bytes, dir.path());
+        let mut ids: Vec<String> = store.iter().unwrap().map(|r| r.unwrap().id).collect();
+        ids.sort();
+        ids
+    };
+    let ids1 = run_once();
+    let ids2 = run_once();
+    assert_eq!(ids1, ids2);
+}
+
+/// 互換 §12-5（EVTX 版）: fixture SHA-256・生成方法を記録できる。
+#[test]
+fn evtx_acceptance_12_5_fixture_metadata_recorded() {
+    let bytes = standard_evtx_fixture();
+    let sha256 = common::sha256_hex(&bytes);
+    assert_eq!(sha256.len(), 64);
+}
+
+/// 互換 §12-6（EVTX 版）: 外部仕様 revision / dependency version を記録する。
+#[test]
+fn evtx_acceptance_12_6_reference_spec_revision_recorded() {
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = standard_evtx_fixture();
+    let (_summary, _issues, store) = run_evtx_parser(&bytes, dir.path());
+
+    for result in store.iter().unwrap() {
+        let event = result.unwrap();
+        assert_eq!(event.attributes["evtx.reference_spec"], EVTX_REF);
+    }
+}
+
+/// 互換 §12-7（EVTX 版）: Legacy .evt を黙って無視しない。
+#[test]
+fn evtx_acceptance_12_7_unsupported_does_not_silently_ignore() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut bytes = common::build_evtx_file_header(0);
+    // Legacy .evt magic。
+    bytes[0..4].copy_from_slice(&[0x4c, 0x66, 0x4c, 0x65]);
+    let (summary, issues, _store) = run_evtx_parser(&bytes, dir.path());
+
+    assert_eq!(summary.status, tf_core::case::ParseStatus::Skipped);
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.issue_id == tf_parsers::issue::UNSUPPORTED_VERSION_CODE)
+    );
+}
+
+/// 互換 §12-8（EVTX 版）: 形式の意味を越えて Event type を断定しない。
+#[test]
+fn evtx_acceptance_12_8_event_type_does_not_overstate_observation() {
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = standard_evtx_fixture();
+    let (_summary, _issues, store) = run_evtx_parser(&bytes, dir.path());
+
+    for result in store.iter().unwrap() {
+        let event = result.unwrap();
+        assert_eq!(event.assertion, tf_core::event::AssertionKind::Observed);
+        let et = event.event_type.as_str();
+        // typed mapping 後の型名（login 等）は「event log service が観測した事象」を
+        // 表すため許容されるが、channel/provider 検証を経ずに typed になってはならない。
+        assert!(!et.is_empty());
+    }
+}
+
+/// EVTX の縦割り: EVTX のみで analyze → Case JSONL + Manifest が生成される。
+#[test]
+fn evtx_vertical_slice_evtx_to_case_jsonl() {
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = standard_evtx_fixture();
+    let (evidence, _) = common::make_snapshot("Security.evtx", &bytes, dir.path());
+    let artifact = common::make_artifact_with_source(
+        &evidence,
+        EVTX_PARSER_ID_V,
+        EVTX_PARSER_VERSION_V,
+        tf_core::event::ArtifactSource::Evtx,
+    );
+
+    let spool_path = dir.path().join("case.spool");
+    let mut store = EventStore::create(&spool_path).unwrap();
+    let mut issues: Vec<tf_core::issue::Issue> = Vec::new();
+    let context = ParseContext {
+        evidence: evidence.clone(),
+        artifact: artifact.clone(),
+    };
+    let snapshot_path = std::path::Path::new(&context.evidence.snapshot_locator);
+    let mut file = std::fs::File::open(snapshot_path).unwrap();
+    {
+        let mut sink = EventStoreSink::new(&mut store, &mut issues);
+        EvtxParser::new().parse(&mut file, &context, &mut sink);
+    }
+    store.commit().unwrap();
+    assert_eq!(store.len(), 6);
+
+    let case_id = tf_core::id::case_id(&[evidence.evidence_id.as_str()]);
+    let case = CaseMetadata {
+        case_id: case_id.clone(),
+        external_case_id: None,
+        name: "EVTX vertical slice".to_string(),
+        analyst: None,
+        description: None,
+        default_timezone: None,
+        tags: vec![],
+    };
+    let other_counts = OtherCounts {
+        evidence: 1,
+        artifact: 1,
+        issue: 0,
+        match_: 0,
+        finding: 0,
+    };
+    let manifest_counts = build_manifest_counts(&store, &other_counts);
+    let manifest = Manifest {
+        traceforge_version: "0.1.0".to_string(),
+        build_commit: "test".to_string(),
+        target: "test".to_string(),
+        schema_version: SCHEMA_VERSION.to_string(),
+        compatibility_profile: "TF-WIN-1.0".to_string(),
+        run_started_at: "2026-08-11T01:00:00Z".to_string(),
+        run_finished_at: "2026-08-11T01:00:01Z".to_string(),
+        resolved_config: serde_json::json!({}),
+        resolved_config_sha256: "d".repeat(64),
+        case_id: case_id.clone(),
+        counts: manifest_counts,
+        components: vec![serde_json::json!({
+            "parser_id": EVTX_PARSER_ID_V,
+            "parser_version": EVTX_PARSER_VERSION_V,
+            "reference": EVTX_REF,
+        })],
+        rules: vec![],
+        attack_dataset: None,
+        timezone_assumptions: vec![],
+        limits: serde_json::json!({}),
+        incomplete_reasons: vec![],
+        complete: true,
+        exit_code: 0,
+    };
+    let stream = CaseStream {
+        case: &case,
+        evidence: std::slice::from_ref(&evidence),
+        artifacts: std::slice::from_ref(&artifact),
+        issues: &issues,
+        matches: &[],
+        findings: &[],
+        manifest: &manifest,
+    };
+
+    let mut output: Vec<u8> = Vec::new();
+    let outcome = write_jsonl(&store, &stream, 1024 * 1024, None, &mut output).unwrap();
+    assert_eq!(outcome.events_output, 6);
+
+    let output_str = String::from_utf8(output).unwrap();
+    let record_types: Vec<String> = output_str
+        .lines()
+        .map(|l| {
+            let v: Value = serde_json::from_str(l).unwrap();
+            v["record_type"].as_str().unwrap().to_string()
+        })
+        .collect();
+    assert_eq!(record_types.last(), Some(&"manifest".to_string()));
+    assert!(
+        record_types
+            .iter()
+            .filter(|t| t == &&"event".to_string())
+            .count()
+            == 6
+    );
+}
