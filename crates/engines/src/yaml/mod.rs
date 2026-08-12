@@ -48,8 +48,12 @@ pub enum YamlValue {
     Null,
     /// YAML `true` / `false`。
     Bool(bool),
-    /// YAML 整数（小数は未対応・Sigma subset では不要）。
+    /// YAML 整数。
     Int(i64),
+    /// YAML 浮動小数（Correlation Rule `score.base` 等で使用）。
+    /// Sigma subset では float を使わないが、Correlation 編（T5-030）で必要になる。
+    /// NaN・Infinity は Schema §2 共通規則で禁止のため、parse 時に finite 値のみ受け付ける。
+    Float(f64),
     /// YAML 文字列（plain・single-quoted・double-quoted の何れか）。
     Str(String),
     /// YAML sequence（block style `- item` または flow style `[a, b]`）。
@@ -91,6 +95,15 @@ impl YamlValue {
         }
     }
 
+    /// `Float` として参照する（`Int` も float として取り出せる）。
+    pub fn as_float(&self) -> Option<f64> {
+        match self {
+            YamlValue::Float(f) => Some(*f),
+            YamlValue::Int(n) => Some(*n as f64),
+            _ => None,
+        }
+    }
+
     /// `Bool` として参照する。
     pub fn as_bool(&self) -> Option<bool> {
         match self {
@@ -112,11 +125,12 @@ impl YamlValue {
         }
     }
 
-    /// 文字列値へ変換する（`Str`・`Int`・`Bool` を文字列化、`Null`/`Seq`/`Map` は `None`）。
+    /// 文字列値へ変換する（`Str`・`Int`・`Float`・`Bool` を文字列化、`Null`/`Seq`/`Map` は `None`）。
     pub fn to_string_value(&self) -> Option<String> {
         match self {
             YamlValue::Str(s) => Some(s.clone()),
             YamlValue::Int(n) => Some(n.to_string()),
+            YamlValue::Float(f) => Some(f.to_string()),
             YamlValue::Bool(b) => Some(b.to_string()),
             _ => None,
         }
@@ -129,6 +143,7 @@ impl YamlValue {
             YamlValue::Null => Some(Vec::new()),
             YamlValue::Str(s) => Some(vec![s.clone()]),
             YamlValue::Int(n) => Some(vec![n.to_string()]),
+            YamlValue::Float(f) => Some(vec![f.to_string()]),
             YamlValue::Bool(b) => Some(vec![b.to_string()]),
             YamlValue::Seq(items) => {
                 let mut result = Vec::with_capacity(items.len());
@@ -146,6 +161,40 @@ impl YamlValue {
         match self {
             YamlValue::Map(m) => Some(m.iter().cloned().collect()),
             _ => None,
+        }
+    }
+
+    /// [`serde_json::Value`]（JSON 互換 data model）へ変換する。
+    ///
+    /// Phase 5 Correlation 編（T5-031）で Schema §7 の JSON Schema validator
+    /// （`tf_core::schema::correlation_rule_validator`）へ通すために使用する。
+    /// YAML 特有の重複 key は [`parse`] 時点で検出済みのため、JSON 変換で上書きは発生しない。
+    /// Map は挿入順 `Vec` で保持しているが、[`serde_json::Map`] は `preserve_order` feature により
+    /// 挿入順を保つため、canonical JSON の出力順は Schema 検証時には影響しない
+    /// （Schema 検証は値の構造のみを問うため）。
+    pub fn to_json(&self) -> serde_json::Value {
+        match self {
+            YamlValue::Null => serde_json::Value::Null,
+            YamlValue::Bool(b) => serde_json::Value::Bool(*b),
+            YamlValue::Int(n) => serde_json::Value::from(*n),
+            YamlValue::Float(f) => {
+                // Schema §2 共通規則: NaN・Infinity 禁止。finite 値のみ許可。
+                // parse 時に finite check をしているため、ここではそのまま Number へ変換する。
+                serde_json::Number::from_f64(*f)
+                    .map(serde_json::Value::Number)
+                    .unwrap_or(serde_json::Value::Null)
+            }
+            YamlValue::Str(s) => serde_json::Value::String(s.clone()),
+            YamlValue::Seq(items) => {
+                serde_json::Value::Array(items.iter().map(Self::to_json).collect())
+            }
+            YamlValue::Map(pairs) => {
+                let mut map = serde_json::Map::new();
+                for (k, v) in pairs {
+                    map.insert(k.clone(), Self::to_json(v));
+                }
+                serde_json::Value::Object(map)
+            }
         }
     }
 }

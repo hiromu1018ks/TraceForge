@@ -2603,7 +2603,9 @@ dependencies = [
 name = "tf-engines"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "hex",
+ "regex",
  "serde_json",
  "sha2",
  "tempfile",

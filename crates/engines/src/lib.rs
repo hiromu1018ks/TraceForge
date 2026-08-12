@@ -16,12 +16,19 @@
 //! YAML parse・Schema 検証は行わず、各 engine の個別 task（T5-010/T5-020/T5-030 等）
 //! で実装する。
 
+pub mod correlation;
 pub mod loader;
 pub mod path_norm;
 pub mod sigma;
 pub mod yaml;
 pub mod yara;
 
+pub use correlation::{
+    AssertionFilter, CompiledCorrelationRule, CorrelationError, CorrelationEvaluationResult,
+    CorrelationEvaluationWarning, CorrelationMatchResult, CorrelationRule,
+    DEFAULT_MAX_CORRELATION_WINDOW_SECONDS, Operator, PartitionKey, Predicate, PredicateValue,
+    ScoreSpec, Step, parse_correlation_rule, validate_correlation_schema,
+};
 pub use loader::{
     DiscoveredRuleFile, DiscoveryOutcome, LoadedRuleFile, MAX_RULE_FILES_LIMIT_CODE,
     RuleDiscoveryOptions, RuleFileError, RuleLoadError, RuleLoadOptions, RuleLoadSummary,

@@ -811,6 +811,16 @@ fn parse_plain_scalar(s: &str) -> YamlValue {
     {
         return YamlValue::Int(n);
     }
+    // 浮動小数（Phase 5 Correlation 編 T5-030・score.base 等で使用）。
+    // YAML 1.2 の float 形式: 符号付き・小数点・指数・`.inf`/`.nan` を含む。
+    // Schema §2 共通規則が NaN・Infinity を禁止するため、finite 値のみを受け付ける。
+    // `.inf`/`.nan`/`.nan` 等は finite でないため文字列として扱う。
+    if let Ok(f) = s.parse::<f64>()
+        && f.is_finite()
+        && s.contains(['.', 'e', 'E'])
+    {
+        return YamlValue::Float(f);
+    }
     YamlValue::Str(s.to_string())
 }
 

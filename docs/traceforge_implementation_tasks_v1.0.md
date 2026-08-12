@@ -309,19 +309,19 @@
 
 ### 8.4 Correlation
 
-- [ ] T5-030 Correlation Rule YAML parser（anchor/alias/custom tag/duplicate key 禁止、Schema §7、規範 §14）
-- [ ] T5-031 Correlation Rule Schema validation（Schema §7）
-- [ ] T5-032 sequence / step / where / bind 評価器（Schema §7）
-- [ ] T5-033 predicate operator 8種（eq/neq/contains/starts_with/ends_with/regex/exists/in、Schema §7）
-- [ ] T5-034 `within` 両端含む・`max_correlation_window_seconds` 上限（規範 §14.1、Schema §8.3）
-- [ ] T5-035 `partition_by`（case_id/hostname/user、規範 §14.1）
-- [ ] T5-036 hostname 不明時の既定非 match（規範 §14.1）
-- [ ] T5-037 不確実時刻の既定非 match・`allow_uncertain_time` 明示時のみ許可 + 記録（規範 §6.4）
-- [ ] T5-038 null・型の厳密比較（暗黙変換禁止、規範 §14.1）
-- [ ] T5-039 未対応 operator の Rule 全体 skip（規範 §14.1）
-- [ ] T5-040 match 重複生成禁止・`max_matches` 打ち切り・Exit Code 1/5（規範 §14.2）
-- [ ] T5-041 score 計算（base + adjustments、clamp、level 変換、規範 §14.3）
-- [ ] T5-042 同一 Evidence 事実の二重加点防止（規範 §14.3）
+- [x] T5-030 Correlation Rule YAML parser（anchor/alias/custom tag/duplicate key 禁止、Schema §7、規範 §14）
+- [x] T5-031 Correlation Rule Schema validation（Schema §7）
+- [x] T5-032 sequence / step / where / bind 評価器（Schema §7）
+- [x] T5-033 predicate operator 8種（eq/neq/contains/starts_with/ends_with/regex/exists/in、Schema §7）
+- [x] T5-034 `within` 両端含む・`max_correlation_window_seconds` 上限（規範 §14.1、Schema §8.3）
+- [x] T5-035 `partition_by`（case_id/hostname/user、規範 §14.1）
+- [x] T5-036 hostname 不明時の既定非 match（規範 §14.1）
+- [x] T5-037 不確実時刻の既定非 match・`allow_uncertain_time` 明示時のみ許可 + 記録（規範 §6.4）
+- [x] T5-038 null・型の厳密比較（暗黙変換禁止、規範 §14.1）
+- [x] T5-039 未対応 operator の Rule 全体 skip（規範 §14.1）
+- [x] T5-040 match 重複生成禁止・`max_matches` 打ち切り・Exit Code 1/5（規範 §14.2）
+- [x] T5-041 score 計算（base + adjustments、clamp、level 変換、規範 §14.3）
+- [x] T5-042 同一 Evidence 事実の二重加点防止（規範 §14.3）
 
 ---
 

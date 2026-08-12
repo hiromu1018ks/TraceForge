@@ -74,3 +74,8 @@ unicode-normalization = "0.1"
 # version は Cargo.lock へ pin され、cargo-deny で再現性と供給連鎖安全を担保する（互換 §7・§11）。
 # `latest` 使用禁止（互換 §7）・固定 version を Manifest へ記録する。
 yara-x = "1.19"
+# 正規表現 matcher（Phase 5 Correlation 編 T5-033・Schema §7 `regex` operator 用）。
+# default features のみ（unicode 一貫性・最適化済み dfa）。Cargo.lock へ pin され、
+# cargo-deny で再現性と供給連鎖安全を担保する。yara-x から間接依存しているため
+# workspace へ明示的に追加しても新規の multiple-versions は発生しない。
+regex = "1"

@@ -96,6 +96,14 @@ path = "fuzz_targets/yara_x.rs"
 test = false
 doc = false
 
+# Phase 5 Correlation 編（T5-030〜T5-042）: Correlation evaluator の fuzz target。
+# 破損 YAML・不正 Schema・巨大 sequence でも panic しないことを継続的 fuzzing で検証する。
+[[bin]]
+name = "correlation"
+path = "fuzz_targets/correlation.rs"
+test = false
+doc = false
+
 # 親 workspace から独立した fuzz 専用 workspace とする。
 # cargo-fuzz は libfuzzer-sys を用い、fuzz target のビルド要件が
 # メイン workspace と異なるため、fmt/clippy/test/doc の対象から切り離す。

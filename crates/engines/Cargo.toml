@@ -23,6 +23,11 @@ thiserror.workspace = true
 serde_json.workspace = true
 # YARA-X compiler・scanner（Phase 5 YARA-X 編 T5-020、互換 §7・規範 §15.2）
 yara-x.workspace = true
+# Correlation Rule の時刻比較（Phase 5 Correlation 編 T5-032・規範 §6.4・§14.1）
+# EventTime から DateTime<Utc> を取り出し within window の境界判定（両端含む）へ使用する。
+chrono.workspace = true
+# Correlation Rule predicate の `regex` operator（Phase 5 Correlation 編 T5-033・Schema §7）
+regex.workspace = true
 
 [dev-dependencies]
 # テスト用一時 directory（Rule directory 構築・dedup 検証等）

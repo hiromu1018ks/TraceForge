@@ -363,6 +363,11 @@ fn parse_values(yaml: &YamlValue) -> Result<Vec<ScalarValue>, SigmaError> {
         YamlValue::Str(s) => Ok(vec![ScalarValue::Str(s.clone())]),
         YamlValue::Int(n) => Ok(vec![ScalarValue::Int(*n)]),
         YamlValue::Bool(b) => Ok(vec![ScalarValue::Bool(*b)]),
+        // Sigma subset は数値として integer のみを許容する。float 値は未対応扱いで
+        // error とする（Phase 5 Sigma 編の互換性維持）。
+        YamlValue::Float(_) => Err(SigmaError::InvalidStructure(
+            "Sigma field value cannot be a float (integer only)".into(),
+        )),
         YamlValue::Seq(items) => {
             let mut values = Vec::with_capacity(items.len());
             for item in items {
