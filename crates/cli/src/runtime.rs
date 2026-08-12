@@ -5,7 +5,7 @@
 //! - [`write_output`] は stdout と file への書き分けと入出力分離を担う
 
 use std::fs;
-use std::io::{self, Write};
+use std::io;
 use std::path::{Path, PathBuf};
 
 use tf_core::case::CaseMetadata;
@@ -157,7 +157,12 @@ impl CaseReadError {
     }
 }
 
-/// 出力先へ bytes を書き込む。`output` が [`None`] の場合は stdout へ出力する。
+/// 出力先へ bytes を書き込む。`output` が [`None`] の場合は stdout への書き出しを行わない。
+///
+/// stdout 出力は呼出側が [`CliResult::stdout`](crate::CliResult::stdout) へ内容を設定し、
+/// [`main`](crate)#stdout への書き出しは `main.rs` で1回だけ行う（規範 §19.1）。
+/// ここで stdout へ直接書き出すと `main.rs` での再出力により二重出力となるため、
+/// `None` の場合は何もしない（呼出側が別途 `bytes` から stdout 文字列を構築する）。
 ///
 /// 規範 §5.4: 既定で上書き禁止。`output` が既存 file の場合は error とする。
 pub fn write_output(
@@ -167,9 +172,7 @@ pub fn write_output(
 ) -> Result<(), OutputWriteError> {
     match output {
         None => {
-            let stdout = io::stdout();
-            let mut handle = stdout.lock();
-            handle.write_all(bytes)?;
+            let _ = (bytes, overwrite);
             Ok(())
         }
         Some(path) => {
