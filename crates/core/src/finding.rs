@@ -129,22 +129,103 @@ impl RuleRef {
     }
 }
 
+/// ATT&CK mapping の生成元（規範 §15.3）。
+///
+/// 4 経路のみを許可する:
+/// - `Rule`: Correlation Rule の `mitre_attack` field 等、Rule が明示した technique
+/// - `SigmaTag`: Sigma Rule の `attack.tXXXX` 形式の tag から抽出した technique
+/// - `BuiltIn`: TraceForge 組み込みの既定 mapping
+/// - `Manual`: ユーザーが明示的に指定した technique
+///
+/// 自動推測・外部サービス問合せによる mapping 生成は禁止する（規範 §15.3）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AttackMappingSource {
+    Rule,
+    SigmaTag,
+    BuiltIn,
+    Manual,
+}
+
+impl AttackMappingSource {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            AttackMappingSource::Rule => "rule",
+            AttackMappingSource::SigmaTag => "sigma_tag",
+            AttackMappingSource::BuiltIn => "built_in",
+            AttackMappingSource::Manual => "manual",
+        }
+    }
+
+    pub fn from_schema_str(s: &str) -> Option<Self> {
+        Some(match s {
+            "rule" => AttackMappingSource::Rule,
+            "sigma_tag" => AttackMappingSource::SigmaTag,
+            "built_in" => AttackMappingSource::BuiltIn,
+            "manual" => AttackMappingSource::Manual,
+            _ => return None,
+        })
+    }
+}
+
 /// ATT&CK mapping（Schema §5.8 `attack_mappings` 要素、規範 §15.3）。
 ///
-/// Phase 1 では technique_id と表示名のみ。Phase 6 で dataset 版数・hash を追加する。
+/// Phase 6 で次を追加した:
+/// - 使用した ATT&CK dataset の version と SHA-256（規範 §15.3・T6-009）
+/// - mapping の生成元（T6-008）
+/// - tactic（technique が属する戦術。dataset から解決した場合のみ設定）
 #[derive(Clone, Debug, PartialEq)]
 pub struct AttackMapping {
     /// `T<4 桁>(.<3 桁>)?`（例: `T1059.001`）。
     pub technique_id: String,
     pub technique_name: Option<String>,
+    /// technique が属する tactic（例: `execution`）。dataset 由来のみ設定する。
+    pub tactic: Option<String>,
+    /// mapping の生成元（規範 §15.3・T6-008）。
+    pub source: AttackMappingSource,
+    /// 使用した ATT&CK dataset の version（互換 §9・T6-009）。
+    /// Rule 生成元で dataset を経由しない場合は `None`。
+    pub dataset_version: Option<String>,
+    /// 使用した ATT&CK dataset の SHA-256 lowercase hex（互換 §9・T6-009）。
+    pub dataset_sha256: Option<String>,
 }
 
 impl AttackMapping {
     pub fn to_canonical_value(&self) -> Value {
-        serde_json::json!({
-            "technique_id": self.technique_id,
-            "technique_name": self.technique_name,
-        })
+        let mut map = Map::new();
+        map.insert(
+            "technique_id".into(),
+            Value::String(self.technique_id.clone()),
+        );
+        map.insert(
+            "technique_name".into(),
+            self.technique_name
+                .clone()
+                .map(Value::String)
+                .unwrap_or(Value::Null),
+        );
+        map.insert(
+            "tactic".into(),
+            self.tactic
+                .clone()
+                .map(Value::String)
+                .unwrap_or(Value::Null),
+        );
+        map.insert("source".into(), Value::String(self.source.as_str().into()));
+        map.insert(
+            "dataset_version".into(),
+            self.dataset_version
+                .clone()
+                .map(Value::String)
+                .unwrap_or(Value::Null),
+        );
+        map.insert(
+            "dataset_sha256".into(),
+            self.dataset_sha256
+                .clone()
+                .map(Value::String)
+                .unwrap_or(Value::Null),
+        );
+        Value::Object(map)
     }
 }
 

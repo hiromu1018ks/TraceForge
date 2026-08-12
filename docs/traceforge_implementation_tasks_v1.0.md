@@ -327,15 +327,15 @@
 
 ## 9. Phase 6: Finding 統合と ATT&CK
 
-- [ ] T6-001 Finding merger（match 喪失なし、規範 §16）
-- [ ] T6-002 自動統合禁止（明示統合 rule のみ、規範 §16）
-- [ ] T6-003 Finding 必須 field 実装（severity / confidence / 参照 ID 群、規範 §16）
-- [ ] T6-004 `Observed evidence` と `Inference` の分離記述（規範 §16、製品 §10）
-- [ ] T6-005 Finding から全元 Event・Evidence への参照検証 test（製品 §10）
-- [ ] T6-006 ATT&CK STIX dataset の version pin・SHA-256・取得元記録（互換 §9）
-- [ ] T6-007 Technique ID の dataset 存在検証（不在 ID は Rule validation error、互換 §9）
-- [ ] T6-008 ATT&CK mapping 生成（Rule / Sigma tag / built-in / manual のみ、規範 §15.3）
-- [ ] T6-009 ATT&CK mapping への dataset version + hash 記録（規範 §15.3）
+- [x] T6-001 Finding merger（match 喪失なし、規範 §16）
+- [x] T6-002 自動統合禁止（明示統合 rule のみ、規範 §16）
+- [x] T6-003 Finding 必須 field 実装（severity / confidence / 参照 ID 群、規範 §16）
+- [x] T6-004 `Observed evidence` と `Inference` の分離記述（規範 §16、製品 §10）
+- [x] T6-005 Finding から全元 Event・Evidence への参照検証 test（製品 §10）
+- [x] T6-006 ATT&CK STIX dataset の version pin・SHA-256・取得元記録（互換 §9）
+- [x] T6-007 Technique ID の dataset 存在検証（不在 ID は Rule validation error、互換 §9）
+- [x] T6-008 ATT&CK mapping 生成（Rule / Sigma tag / built-in / manual のみ、規範 §15.3）
+- [x] T6-009 ATT&CK mapping への dataset version + hash 記録（規範 §15.3）
 
 ---
 

@@ -42,7 +42,9 @@ pub use error::{ExitCode, StrictMode, StrictScope, StrictScopeParseError, TraceF
 pub use event::{
     ArtifactSource, AssertionKind, Event, EventType, ProcessRef, Provenance, RecordLocator,
 };
-pub use finding::{AttackMapping, Confidence, ConfidenceLevel, Finding, RuleRef, Score};
+pub use finding::{
+    AttackMapping, AttackMappingSource, Confidence, ConfidenceLevel, Finding, RuleRef, Score,
+};
 pub use issue::{Issue, IssueScope, IssueSeverity};
 pub use jsonl::{CaseBundle, JsonlRecord};
 pub use manifest::{Manifest, ManifestCounts};

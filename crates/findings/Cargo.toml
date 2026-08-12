@@ -9,3 +9,15 @@ publish.workspace = true
 
 [lints]
 workspace = true
+
+[dependencies]
+# tf-core: Finding / Match / Severity / Confidence / AttackMapping / 決定的 ID（規範 §12.4）
+tf-core = { path = "../core", version = "0.1.0" }
+# canonical JSON 構築・dataset（STIX bundle）の値参照
+serde_json = { workspace = true }
+# Finding 統合 error 型の derive（規範 §17.2）
+thiserror = { workspace = true }
+
+[dev-dependencies]
+# テスト用一時 directory（dataset file 読込み検証等）
+tempfile = "3"

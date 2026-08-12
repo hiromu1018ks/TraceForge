@@ -2633,6 +2633,12 @@ version = "0.1.0"
 [[package]]
 name = "tf-findings"
 version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "tempfile",
+ "tf-core",
+ "thiserror 1.0.69",
+]
 
 [[package]]
 name = "tf-parsers"
