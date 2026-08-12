@@ -1,0 +1,10 @@
+title: minimal sigma
+id: 00000000-0000-0000-0000-000000000002
+status: experimental
+logsource:
+    product: windows
+    service: security
+detection:
+    sel:
+        EventID: 4624
+    condition: sel

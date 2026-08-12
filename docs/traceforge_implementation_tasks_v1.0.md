@@ -377,30 +377,30 @@
 
 ### 11.1 決定性・再現性
 
-- [ ] T8-001 golden determinism test（threads 1/2/自動で canonical JSON byte 一致、規範 §13.3、§21-7）
-- [ ] T8-002 分析レコード vs run metadata の同一性比較分離 test（規範 §13.1）
-- [ ] T8-003 hash map iteration 順非依存 test（規範 §13.2）
-- [ ] T8-004 regression test 基盤
+- [x] T8-001 golden determinism test（threads 1/2/自動で canonical JSON byte 一致、規範 §13.3、§21-7）
+- [x] T8-002 分析レコード vs run metadata の同一性比較分離 test（規範 §13.1）
+- [x] T8-003 hash map iteration 順非依存 test（規範 §13.2）
+- [x] T8-004 regression test 基盤
 
 ### 11.2 耐性・安全性
 
-- [ ] T8-010 破損 fixture 群での panic 非発生 test（製品 §13.2）
-- [ ] T8-011 fuzz campaign 実施・corpus 蓄積（F-025）
-- [ ] T8-012 解析中の入力変更を再現する integrity test（製品 §13.1）
-- [ ] T8-013 resource limit test（到達時の `complete=false` 含む、規範 §21-14）
-- [ ] T8-014 過大 allocation・無限 loop 対策 test（製品 §4.5）
-- [ ] T8-015 path traversal 対策 test（製品 §4.5）
+- [x] T8-010 破損 fixture 群での panic 非発生 test（製品 §13.2）
+- [x] T8-011 fuzz campaign 実施・corpus 蓄積（F-025）
+- [x] T8-012 解析中の入力変更を再現する integrity test（製品 §13.1）
+- [x] T8-013 resource limit test（到達時の `complete=false` 含む、規範 §21-14）
+- [x] T8-014 過大 allocation・無限 loop 対策 test（製品 §4.5）
+- [x] T8-015 path traversal 対策 test（製品 §4.5）
 
 ### 11.3 互換性・リリース
 
-- [ ] T8-020 全 Required 対象の compatibility acceptance 最終確認（互換 §12 全 8 項目）
-- [ ] T8-021 Timesketch import 検証（実 instance または公式 validator、互換 §8）
-- [ ] T8-022 Schema validator での全 Golden output 検証（Schema §9）
-- [ ] T8-023 benchmark 実測（測定条件付き、製品 §13.2）
-- [ ] T8-024 README 例の実 fixture からの自動生成（製品 §13.2）
-- [ ] T8-025 dependency・license・advisory 記録の生成（互換 §11）
-- [ ] T8-026 参照外部仕様 revision の記録確認（`[MS-SHLLINK]` 等、互換 §12-6）
-- [ ] T8-027 release gate checklist 実施（roadmap §8）
+- [x] T8-020 全 Required 対象の compatibility acceptance 最終確認（互換 §12 全 8 項目）
+- [x] T8-021 Timesketch import 検証（実 instance または公式 validator、互換 §8）
+- [x] T8-022 Schema validator での全 Golden output 検証（Schema §9）
+- [x] T8-023 benchmark 実測（測定条件付き、製品 §13.2）
+- [x] T8-024 README 例の実 fixture からの自動生成（製品 §13.2）
+- [x] T8-025 dependency・license・advisory 記録の生成（互換 §11）
+- [x] T8-026 参照外部仕様 revision の記録確認（`[MS-SHLLINK]` 等、互換 §12-6）
+- [x] T8-027 release gate checklist 実施（roadmap §8）
 
 ---
 

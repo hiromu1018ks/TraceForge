@@ -30,7 +30,9 @@ Desktop.ini
 
 # fuzzing / benchmark 一時成果物
 /fuzz/artifacts/
-/fuzz/corpus/
+# fuzz corpus は T8-011（F-025）で repository へ格納する。
+# 各 target へ正常最小入力 + 破損/境界値入力の seed corpus を含む。
+# cargo-fuzz が実行中に生成する変異入力は /fuzz/artifacts/ へ隔離される。
 # fuzz crate は workspace 外の独立 crate であり、lock と target は
 # 環境依存で変わるためバージョン管理しない（cargo-fuzz 標準）。
 /fuzz/Cargo.lock

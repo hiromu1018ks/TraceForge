@@ -1,0 +1,9 @@
+file: C:\Users\hirom\AppData\Local\Temp\opencode\tf_examples\sample.lnk
+size: 80 bytes
+is_directory: false
+read_only: true（規範 §2）
+sha256: 54987b29a186976bc79444b8a7cd12da033838b03598a04be58c4fe137ef87ff
+magic (first 8 bytes hex): 4c00000001140200
+probable_kind: lnk (推定)
+
+hint: 詳細な解析は `traceforge analyze` を使用してください。

@@ -1,0 +1,8 @@
+traceforge 0.1.0
+  schema: 1.0.0
+  compatibility profile: TF-WIN-1.0
+  build commit: (dev)
+  target: x86_64-pc-windows-msvc
+  sigma engine: TF-SIGMA-1.0
+  correlation engine: TF-CORR-1.0
+  yara-x engine: yara-x-1.19

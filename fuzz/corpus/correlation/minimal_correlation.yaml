@@ -1,0 +1,15 @@
+name: minimal correlation
+steps:
+  - name: first
+    event_type: login
+    where:
+      operator: eq
+      field: user
+      value: admin
+  - name: second
+    event_type: process_start
+    where:
+      operator: eq
+      field: user
+      value: admin
+    within_seconds: 300

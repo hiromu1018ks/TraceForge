@@ -1,0 +1,9 @@
+title: minimal correlation rule
+id: 00000000-0000-0000-0000-000000000001
+steps:
+  - name: step_a
+    event_type: process_start
+    where:
+      operator: eq
+      field: user
+      value: admin

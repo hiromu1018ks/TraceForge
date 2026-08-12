@@ -1,0 +1,38 @@
+TraceForge Case Report
+======================
+case_id: tf-case-v1:f80082a66a368fb45507c0944a8394e19794663309738f0a1f1cbdda49b77601
+name: sample.lnk
+
+Evidence (1)
+--------------------
+- tf-evidence-v1:2151072d302fe3e216d378e7d024956d86c1b067f0966e1126bb537881cd125f (sample.lnk): size=80, sha256=54987b29a186976bc79444b8a7cd12da033838b03598a04be58c4fe137ef87ff, integrity=verified_snapshot, parse_eligible=true
+
+Artifacts (1)
+----------------------
+- tf-artifact-v1:fed2176709453b46cf3d9eb0445ceec85885ac72d45e04c134b561c36fd5b97b evidence=tf-evidence-v1:2151072d302fe3e216d378e7d024956d86c1b067f0966e1126bb537881cd125f type=lnk parser=traceforge-lnk@1.0.0 probe=confirmed status=complete
+
+Events (1)
+----------------
+- [tf-event-v1:bc0c55fcd43e97e41c1c0f8fd7fd39b7371c1f43464fb5999f472c9a3ebe334d] 2014-11-15T16:53:20Z type=lnk_timestamp source=lnk assertion=observed
+  message: LNK write timestamp の観測
+
+Issues (0)
+---------------
+
+Matches (0)
+-----------------
+
+Findings (0)
+------------------
+
+Manifest Summary
+----------------
+traceforge_version: 0.1.0
+schema_version: 1.0.0
+compatibility_profile: TF-WIN-1.0
+run_started_at: 2026-08-12T13:47:28.045521900Z
+run_finished_at: 2026-08-12T13:47:28.065418500Z
+case_id: tf-case-v1:f80082a66a368fb45507c0944a8394e19794663309738f0a1f1cbdda49b77601
+counts: evidence=1 artifact=1 event=1 issue=0 match=0 finding=0
+complete: true
+exit_code: 0
