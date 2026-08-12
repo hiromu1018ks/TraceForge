@@ -9,3 +9,19 @@ publish.workspace = true
 
 [lints]
 workspace = true
+
+[dependencies]
+# Phase 1 のコアデータモデル（CaseMetadata・EvidenceItem・ArtifactInstance・Event・Finding・Manifest 等）
+tf-core = { path = "../core", version = "0.1.0" }
+# Phase 3 の EventStore・Timeline filter（streaming 出力・Timeline 順 sort 用）
+tf-store = { path = "../store", version = "0.1.0" }
+# canonical JSON 構築・Case JSON / JSONL 出力（Schema §2.1・§5・§6）
+serde_json.workspace = true
+# Error 型 derive（規範 §17.2）
+thiserror.workspace = true
+
+[dev-dependencies]
+# テスト用一時 directory（EventStore spool file・入出力分離 test 等）
+tempfile = "3"
+# テスト用 EventTime 構築（UtcInstant・NaiveDateTime 等）
+chrono.workspace = true

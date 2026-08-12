@@ -244,6 +244,11 @@ impl RuleLoadOptions {
             max_files: self.max_files,
         }
     }
+
+    /// discovery options への変換を公開（CLI 等の呼出側が同じ設定を使えるようにする）。
+    pub fn to_discovery_options(&self) -> RuleDiscoveryOptions {
+        self.as_discovery_options()
+    }
 }
 
 /// 発見した1件の Rule file 候補（未読み込み）。

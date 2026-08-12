@@ -10,4 +10,34 @@ publish.workspace = true
 [lints]
 workspace = true
 
-# Phase 0 では依存なし。Phase 7 で clap 等を追加する。
+[dependencies]
+# Phase 1 のコアデータモデル（ExitCode・Config・Schema・Issue 等）
+tf-core = { path = "../core", version = "0.1.0" }
+# Phase 2 の Evidence discovery・snapshot・probe（analyze command 用）
+tf-evidence = { path = "../evidence", version = "0.1.0" }
+# Phase 3 の EventStore・Timeline（events の保存・Timeline 順出力）
+tf-store = { path = "../store", version = "0.1.0" }
+# Phase 4 の Parser 群（analyze command が各 Evidence へ適用）
+tf-parsers = { path = "../parsers", version = "0.1.0" }
+# Phase 5 の検知エンジン（sigma / correlate / yara command 用）
+tf-engines = { path = "../engines", version = "0.1.0" }
+# Phase 6 の Finding 統合・ATT&CK dataset（analyze command の検知統合）
+tf-findings = { path = "../findings", version = "0.1.0" }
+# Phase 7 の Exporter（6 出力形式・出力安全性）
+tf-export = { path = "../export", version = "0.1.0" }
+# canonical JSON 構築（Case JSON / JSONL 出力・Schema 検証）
+serde_json.workspace = true
+# SHA-256 digest 計算（inspect command で file の SHA-256 を算出・規範 §2）
+sha2.workspace = true
+# digest の lowercase hex 変換（規範 §12・Schema §2.1）
+hex.workspace = true
+# chrono は analyze command の run 時刻取得（run metadata 用・規範 §13.1）に使用
+chrono.workspace = true
+# tempfile は analyze の EventStore spool file・snapshot を一時 directory へ配置
+tempfile = "3"
+# Error 型 derive（規範 §17.2）
+thiserror.workspace = true
+
+[dev-dependencies]
+# テスト用一時 directory（CLI command の end-to-end test）
+tempfile = "3"

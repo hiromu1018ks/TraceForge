@@ -343,33 +343,33 @@
 
 ### 10.1 Exporter
 
-- [ ] T7-001 Text exporter（制御文字・ESC の可視 escape、規範 §19.1）
-- [ ] T7-002 JSON exporter（Case JSON Schema、Schema §5）
-- [ ] T7-003 JSONL exporter（固定出力順、Manifest 必ず最終行、Schema §6）
-- [ ] T7-004 CSV exporter（RFC 4180、formula injection 対策 + `csv_sanitized` 記録、規範 §19.2）
-- [ ] T7-005 HTML exporter（offline、CSP 埋込、text node escape、外部 request なし、規範 §19.3）
-- [ ] T7-006 Timesketch exporter（必須 field、変換不可 Event の除外 + summary 記録 + Exit Code 1、互換 §8）
-- [ ] T7-007 JSON/JSONL 出力の UTF-8・LF・NaN/Infinity 禁止（規範 §19.4）
-- [ ] T7-008 出力 injection test（CSV formula / terminal ESC / HTML script、規範 §21-11）
-- [ ] T7-009 異 Schema major version の自動変換禁止（互換 §10）
+- [x] T7-001 Text exporter（制御文字・ESC の可視 escape、規範 §19.1）
+- [x] T7-002 JSON exporter（Case JSON Schema、Schema §5）
+- [x] T7-003 JSONL exporter（固定出力順、Manifest 必ず最終行、Schema §6）
+- [x] T7-004 CSV exporter（RFC 4180、formula injection 対策 + `csv_sanitized` 記録、規範 §19.2）
+- [x] T7-005 HTML exporter（offline、CSP 埋込、text node escape、外部 request なし、規範 §19.3）
+- [x] T7-006 Timesketch exporter（必須 field、変換不可 Event の除外 + summary 記録 + Exit Code 1、互換 §8）
+- [x] T7-007 JSON/JSONL 出力の UTF-8・LF・NaN/Infinity 禁止（規範 §19.4）
+- [x] T7-008 出力 injection test（CSV formula / terminal ESC / HTML script、規範 §21-11）
+- [x] T7-009 異 Schema major version の自動変換禁止（互換 §10）
 
 ### 10.2 CLI
 
-- [ ] T7-020 CLI 骨格（`traceforge <COMMAND> [OPTIONS]`、製品 §12）
-- [ ] T7-021 `analyze`（既定 read-only / recursive / SHA-256 / 外部通信なし、規範 §2）
-- [ ] T7-022 `--no-hash` を提供しないことの確認（規範 §2）
-- [ ] T7-023 `timeline`（表示・filter、製品 §12）
-- [ ] T7-024 `correlate`（保存済み Event へ適用、製品 §12）
-- [ ] T7-025 `sigma`（保存済み Event へ適用、製品 §12）
-- [ ] T7-026 `yara`（明示 Evidence へ適用、製品 §12）
-- [ ] T7-027 `export`（Case 変換、製品 §12）
-- [ ] T7-028 `rules`（validate・一覧、製品 §12）
-- [ ] T7-029 `inspect`（単一 Artifact の安全な概要、製品 §12）
-- [ ] T7-030 `version`（tool・Schema・compatibility profile、製品 §12）
-- [ ] T7-031 危険 option の警告と Manifest 記録（製品 §12）
-- [ ] T7-032 Manifest 確定処理（全必須 field、規範 §20）
-- [ ] T7-033 run metadata が分析 determinism へ影響しないことの test（規範 §20）
-- [ ] T7-034 stdout = 解析結果、stderr = log、quiet で結果非抑制（規範 §19.1）
+- [x] T7-020 CLI 骨格（`traceforge <COMMAND> [OPTIONS]`、製品 §12）
+- [x] T7-021 `analyze`（既定 read-only / recursive / SHA-256 / 外部通信なし、規範 §2）
+- [x] T7-022 `--no-hash` を提供しないことの確認（規範 §2）
+- [x] T7-023 `timeline`（表示・filter、製品 §12）
+- [x] T7-024 `correlate`（保存済み Event へ適用、製品 §12）
+- [x] T7-025 `sigma`（保存済み Event へ適用、製品 §12）
+- [x] T7-026 `yara`（明示 Evidence へ適用、製品 §12）
+- [x] T7-027 `export`（Case 変換、製品 §12）
+- [x] T7-028 `rules`（validate・一覧、製品 §12）
+- [x] T7-029 `inspect`（単一 Artifact の安全な概要、製品 §12）
+- [x] T7-030 `version`（tool・Schema・compatibility profile、製品 §12）
+- [x] T7-031 危険 option の警告と Manifest 記録（製品 §12）
+- [x] T7-032 Manifest 確定処理（全必須 field、規範 §20）
+- [x] T7-033 run metadata が分析 determinism へ影響しないことの test（規範 §20）
+- [x] T7-034 stdout = 解析結果、stderr = log、quiet で結果非抑制（規範 §19.1）
 
 ---
 

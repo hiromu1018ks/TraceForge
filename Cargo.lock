@@ -2581,6 +2581,21 @@ checksum = "f18aa187839b2bdb1ad2fa35ead8c4c2976b64e4363c386d45ac0f7ee85c9233"
 [[package]]
 name = "tf-cli"
 version = "0.1.0"
+dependencies = [
+ "chrono",
+ "hex",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "tf-core",
+ "tf-engines",
+ "tf-evidence",
+ "tf-export",
+ "tf-findings",
+ "tf-parsers",
+ "tf-store",
+ "thiserror 1.0.69",
+]
 
 [[package]]
 name = "tf-core"
@@ -2629,6 +2644,14 @@ dependencies = [
 [[package]]
 name = "tf-export"
 version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde_json",
+ "tempfile",
+ "tf-core",
+ "tf-store",
+ "thiserror 1.0.69",
+]
 
 [[package]]
 name = "tf-findings"
